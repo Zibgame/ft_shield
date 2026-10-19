@@ -1,34 +1,38 @@
-NAME = ft_shield
+# **************************************************************************** #
+#                                                                              #
+#                                                         :::      ::::::::    #
+#    Makefile                                           :+:      :+:    :+:    #
+#                                                     +:+ +:+         +:+      #
+#    By: zcadinot <zcadinot@student.42lehavre.      +#+  +:+       +#+         #
+#                                                 +#+#+#+#+#+   +#+            #
+#    Created: 2026/10/19 18:05:52 by zcadinot          #+#    #+#              #
+#    Updated: 2026/10/19 18:09:11 by zcadinot         ###   ########.fr        #
+#                                                                              #
+# **************************************************************************** #
 
-CC = gcc
-CFLAGS = -Wall -Wextra -Werror -O2
-INCLUDES = -I include
-SRCDIR = src
-OBJDIR = obj
+NAME        = ft_shield.exe
 
-SRCS = $(SRCDIR)/main.c \
-       $(SRCDIR)/daemon.c \
-       $(SRCDIR)/network.c \
-       $(SRCDIR)/auth.c \
-       $(SRCDIR)/shell.c \
-       $(SRCDIR)/persistence.c \
-       $(SRCDIR)/stealth.c
+CC          = x86_64-w64-mingw32-gcc
+CFLAGS      = -O3 -Iinclude
+LDFLAGS     =
 
-OBJS = $(SRCS:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+SRC_DIR     = src
+OBJ_DIR     = obj
+
+SRCS        = $(shell find $(SRC_DIR) -name '*.c')
+OBJS        = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
 
 all: $(NAME)
 
 $(NAME): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(OBJS) $(LDFLAGS) -o $@
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJDIR):
-	mkdir -p $@
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(OBJDIR)
+	rm -rf $(OBJ_DIR)
 
 fclean: clean
 	rm -f $(NAME)
@@ -36,3 +40,4 @@ fclean: clean
 re: fclean all
 
 .PHONY: all clean fclean re
+
