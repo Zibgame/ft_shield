@@ -6,7 +6,7 @@
 /*   By: zcadinot <zcadinot@student.42lehavre.      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/19 18:02:57 by zcadinot          #+#    #+#             */
-/*   Updated: 2026/10/20 16:09:22 by zcadinot         ###   ########.fr       */
+/*   Updated: 2026/10/20 16:11:17 by zcadinot         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -60,7 +60,7 @@ int mode_normal()
         L"\"C:\\Windows\\System32\\ft_shield.exe\" --daemon";
 
     si.cb = sizeof(si);
-    if (!CreateProcessW(L"C:\\Windows\\System32\\ft_shield.exe", command_line, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+    if (!CreateProcessW(L"C:\\Windows\\System32\\ft_shield.exe", command_line, NULL, NULL, FALSE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi))
     {
         printf("CreateProcessW erreur : %lu\n",
             (unsigned long)GetLastError());
