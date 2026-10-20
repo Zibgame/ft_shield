@@ -1,6 +1,5 @@
 # ft_shield
 
-A trojan horse daemon written in C for 42 school. ft_shield installs itself as a stealthy background service, listens on port 4242, authenticates clients with a hashed password, and spawns a root shell.
 
 ## Architecture
 
