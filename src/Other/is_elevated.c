@@ -10,7 +10,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "ft_sheild.h"
+#include "ft_shield.h"
 
 int is_elevated(void)
 {

