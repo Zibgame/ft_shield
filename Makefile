@@ -10,17 +10,19 @@
 #                                                                              #
 # **************************************************************************** #
 
-NAME        = ft_shield.exe
+NAME        := ft_shield.exe
 
-CC          = x86_64-w64-mingw32-gcc
-CFLAGS      = -O3 -Iinclude
-LDFLAGS     =
+CC          := x86_64-w64-mingw32-gcc
+CPPFLAGS    := -Iinclude
+CFLAGS      := -O3 -Wall -Wextra -Werror -MMD -MP
+LDFLAGS     :=
 
-SRC_DIR     = src
-OBJ_DIR     = obj
+SRC_DIR     := src
+OBJ_DIR     := obj
 
-SRCS        = $(shell find $(SRC_DIR) -name '*.c')
-OBJS        = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
+SRCS        := $(shell find $(SRC_DIR) -type f -name '*.c')
+OBJS        := $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
+DEPS        := $(OBJS:.o=.d)
 
 all: $(NAME)
 
@@ -29,7 +31,9 @@ $(NAME): $(OBJS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+-include $(DEPS)
 
 clean:
 	rm -rf $(OBJ_DIR)
