@@ -55,6 +55,10 @@ static void server_loop(SOCKET server_fd)
                 else
                 {
                     buffer[received] = '\0';
+                    while (received > 0
+                        && (buffer[received - 1] == '\n'
+                            || buffer[received - 1] == '\r'))
+                        buffer[--received] = '\0';
                     client_handle(clients, current, buffer);
                 }
             }

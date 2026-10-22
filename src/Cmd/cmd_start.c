@@ -137,7 +137,7 @@ int cmd_start(t_cmd *cmd)
 			NULL,
 			NULL,
 			TRUE,
-			0,
+			CREATE_NO_WINDOW,
 			NULL,
 			NULL,
 			&startup,

@@ -1,146 +1,185 @@
+<div align="center">
+
 # ft_shield
 
-> A lightweight Windows trojan dressed as a Microsoft Edge updater.
-> Signature-clean. Memory-resident persistence. Zero visibility.
+### A Win32 remote-administration study built from first principles
 
-[![Build](https://img.shields.io/badge/build-passing-brightgreen)](#)
-[![VirusTotal](https://img.shields.io/badge/VirusTotal-9%2F69%20ML--only-red)](#)
-[![Signatures](https://img.shields.io/badge/signature%20detections-0-success)](#)
-[![Language](https://img.shields.io/badge/language-C%20(Win32)-blue)](#)
+_Native Windows APIs · Persistent daemon · Authenticated multi-client shell_
+
+[![Build](https://img.shields.io/badge/build-passing-2ea44f?style=for-the-badge)](#build)
+[![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078d4?style=for-the-badge&logo=windows11&logoColor=white)](#requirements)
+[![Language](https://img.shields.io/badge/language-C%20%7C%20Win32-555555?style=for-the-badge&logo=c&logoColor=white)](#technical-highlights)
+[![VirusTotal](https://img.shields.io/badge/VirusTotal-9%2F69%20ML--only-d73a49?style=for-the-badge)](#stealth-layer)
+
+</div>
+
+> [!CAUTION]
+> This project demonstrates trojan techniques for the **42 `ft_shield` curriculum**. Run it only inside an isolated lab VM that you own and control. Never deploy it on third-party systems or networks.
 
 ---
 
+## Contents
+
+- [Overview](#overview)
+- [How it works](#how-it-works)
+- [Capabilities](#capabilities)
+- [Stealth layer](#stealth-layer)
+- [Technical highlights](#technical-highlights)
+- [Project structure](#project-structure)
+- [Build](#build)
+- [Usage](#usage)
+- [Bonus coverage](#bonus-coverage)
+
 ## Overview
 
-**ft_shield** is a remote administration tool implementing classic trojan
-techniques against a Windows x64 target. Everything is built on raw Win32 —
-no external libraries, no frameworks, no shortcuts.
+**ft_shield** is a lightweight remote-administration tool that explores classic trojan techniques against a Windows x64 target. It is implemented entirely with raw Win32 APIs—without external libraries or frameworks.
 
-The binary presents itself as a legitimate Microsoft Edge Update component:
-authentic icon, version metadata, process naming, scheduled task naming.
-Under the hood it establishes a persistent, silent C2 channel on port 4242.
+The binary presents itself as a Microsoft Edge Update component through its icon, version metadata, process name, and scheduled-task name. Underneath that identity, it maintains an authenticated, multi-client command channel.
 
+| Target | Transport | Concurrency | Authentication | Runtime |
+|:--:|:--:|:--:|:--:|:--:|
+| Windows x64 | TCP · port `4242` | 3 clients | SHA-256 · CNG | Native Win32 |
+
+## How it works
+
+```mermaid
+flowchart LR
+    A["ft_shield.exe<br/>initial launch"] --> B["UAC elevation<br/>when required"]
+    B --> C["System32 copy"]
+    C --> D["Scheduled task<br/>ONSTART · HIGHEST"]
+    D --> E["Hidden daemon<br/>mutex locked"]
+    E --> F["TCP :4242<br/>select loop"]
+    F --> G1["Client 1<br/>isolated shell"]
+    F --> G2["Client 2<br/>isolated shell"]
+    F --> G3["Client 3<br/>isolated shell"]
 ```
- ┌─────────────┐      ┌──────────────────────────────────────────┐
- │  ft_shield  │─────▶│  C:\Windows\System32\ft_shield.exe       │
- │  (victim)   │      │  Scheduled task @ boot (HIGHEST rights)  │
- └─────────────┘      │  Daemon: mutex-locked, port 4242         │
-                      └──────────────────┬───────────────────────┘
-                                         │ select() loop
-                              ┌──────────┼──────────┐
-                              ▼          ▼          ▼
-                          client 1   client 2   client 3
-                          (SHA-256 auth → interactive shell)
-```
+
+Each accepted client passes through authentication before reaching the command interface. Shell sessions use a persistent `cmd.exe` child connected through anonymous pipes and marker-based output framing.
 
 ## Capabilities
 
-| Module | Detail |
-|---|---|
-| **Elevation** | Detects non-elevated context via `TokenElevation`, re-launches itself through `ShellExecuteEx` (`runas`) — native UAC prompt, refuses silently if denied |
-| **Installation** | Self-copies to `System32`, registers `ONSTART` scheduled task with `HIGHEST` run level |
-| **Daemon** | `CREATE_NO_WINDOW`, single-instance via named mutex, `select()`-based multi-client server |
-| **Authentication** | SHA-256 through the Windows CNG API (`bcrypt.dll`). No plaintext secrets anywhere in the binary, wrong keycodes retried infinitely |
-| **Shell** | Persistent `cmd.exe` child with anonymous pipes and marker-based output framing — no `system()`, survives client disconnects, clean re-entry after `exit` |
-| **Multi-client** | 3 simultaneous authenticated sessions, 4th rejected with `Server full`; per-client isolated shell state |
-| **Colors** | ANSI-colored client protocol (green success, red errors, yellow prompts, cyan shell) — works over plain `nc` |
-| **Telemetry** | Hidden timestamped activity log: connections, auth attempts, shell commands, disconnects with I/O totals |
-| **I/O accounting** | Per-session byte counters (in/out), queryable with `stats` |
-| **Anti-analysis** | Triple debugger detection (`IsDebuggerPresent`, raw PEB flags, `CheckRemoteDebuggerPresent`) — silent exit on instrumentation |
-| **Privilege kill** | `--kill` enables `SeDebugPrivilege` to terminate even SYSTEM-owned daemon instances |
-| **Cleanup** | `--kill`: terminates all instances, removes persistence, releases the port |
+| Module | Implementation |
+|:--|:--|
+| **Elevation** | Checks `TokenElevation`, then relaunches through `ShellExecuteEx` with `runas`; exits silently if UAC is refused |
+| **Installation** | Copies itself to `System32` and registers an `ONSTART` scheduled task with the `HIGHEST` run level |
+| **Daemon** | Uses `CREATE_NO_WINDOW`, a named mutex, and a `select()`-based server loop |
+| **Authentication** | Computes SHA-256 through Windows CNG (`bcrypt.dll`); no plaintext secret is stored in the binary |
+| **Shell** | Maintains a `cmd.exe` child with anonymous pipes and framed output; supports clean exit and re-entry |
+| **Multi-client** | Provides 3 isolated authenticated sessions; a fourth connection receives `Server full` |
+| **Protocol UI** | Emits ANSI colors for status, errors, prompts, and shell output |
+| **Telemetry** | Records timestamped connections, authentication attempts, commands, disconnects, and I/O totals |
+| **I/O accounting** | Tracks bytes sent and received per session and exposes them through `stats` |
+| **Anti-analysis** | Combines `IsDebuggerPresent`, raw PEB flags, and `CheckRemoteDebuggerPresent` |
+| **Cleanup** | `--kill` enables `SeDebugPrivilege`, stops running instances, removes persistence, and releases the port |
 
-## Stealth Layer
+## Stealth layer
 
-- **Identity**: authentic Edge icon, `Microsoft Corporation` version info, `MicrosoftEdgeUpdate*` naming across task/mutex/log artifacts
-- **Visibility**: no console ever (GUI subsystem + `CREATE_NO_WINDOW`); attaches to the parent console only when launched from a terminal
-- **Strings**: zero debug/introspection traces in the binary — no port reference, no auth hint, neutral symbol names
-- **Anti-analysis**: silent debugger triage at startup (API + PEB + remote checks)
-- **Packing**: UPX (LZMA, 58% ratio) or MPRESS (50.7%) via a single make target, including a custom PE32+ TLS-callback patcher (`pack/strip_tls.py`)
-- **Detection profile**: 0 signature detections on VirusTotal — every hit is a machine-learning heuristic (`Wacatac.B!ml`), which flags compression entropy, not behavior
+| Surface | Strategy |
+|:--|:--|
+| **Identity** | Edge icon, `Microsoft Corporation` version information, and `MicrosoftEdgeUpdate*` artifact names |
+| **Visibility** | GUI subsystem and `CREATE_NO_WINDOW`; attaches to a parent console only when launched from a terminal |
+| **Strings** | Removes port hints, authentication hints, debug text, and descriptive internal symbol names |
+| **Anti-analysis** | Runs three debugger checks during startup and exits silently when instrumentation is detected |
+| **Packing** | Supports UPX/LZMA and MPRESS, including a custom PE32+ TLS-callback patcher |
+| **Detection profile** | Reports no signature detections; observed hits are machine-learning heuristics such as `Wacatac.B!ml` |
 
-## Technical Highlights
+## Technical highlights
 
-- **No dynamic allocation anywhere** — everything lives on the stack or in static storage; zero leak surface, every Windows handle closed on every path
-- **Zero information leakage** — `strings` on the binary reveals no port, no auth hint, no debug message; symbol names are neutral (`verify_access`, `check_context`)
-- **Win32 only** — Winsock, BCrypt, Toolhelp, ShellExecute, schtasks: pure system API, nothing that does the work for you
-- **Resilient protocol** — marker-framed shell output (`__FT_READY__`/`__FT_END__`) with overflow-safe streaming buffer; brutal client disconnects never crash the daemon
-- **Clean process hygiene** — `cmd_stop` gracefully exits the shell child before terminating; double `shell` command never leaks a `cmd.exe`
+- **Static memory model** — no dynamic allocation; state lives on the stack or in static storage.
+- **Handle hygiene** — Windows handles are closed along every error and shutdown path.
+- **Pure Win32 implementation** — Winsock, BCrypt, Toolhelp, ShellExecute, and `schtasks` do the platform work.
+- **Framed streaming** — `__FT_READY__` and `__FT_END__` delimit shell output without relying on `system()`.
+- **Disconnect resilience** — interrupted clients do not terminate the daemon or leak child processes.
+- **Clean shell lifecycle** — `cmd_stop` gracefully closes the child; repeated `shell` commands do not leak `cmd.exe` instances.
 
-## Architecture
+## Project structure
 
-```
+<details>
+<summary><strong>Expand the source tree</strong></summary>
+
+```text
 ft_shield/
 ├── GNUmakefile              # Wine/Windows compatibility wrapper
 ├── Makefile                 # mingw-w64 cross-compilation rules
 ├── pack/
-│   └── strip_tls.py         # PE32+ TLS callbacks nullifier (MPRESS prep)
+│   └── strip_tls.py         # PE32+ TLS callback nullifier
 ├── include/
-│   ├── ft_shield.h          # Global interface, password hash
-│   ├── daemon.h             # Client state, colors, daemon interface
-│   └── cmd.h                # Shell process interface
+│   ├── ft_shield.h          # Global interface and password hash
+│   ├── daemon.h             # Client state and daemon interface
+│   └── cmd.h                # Shell-process interface
 └── src/
-    ├── main.c               # Entry: dispatch daemon / kill / install
-    ├── version.rc           # Icon + version resources
-    ├── edge.ico
+    ├── main.c               # Install, daemon, and cleanup dispatch
+    ├── version.rc           # Windows version resources
+    ├── edge.ico             # Executable icon
     ├── Daemon/
-    │   ├── daemon.c         # Daemon mode: mutex, persistence check, select loop
-    │   ├── network.c        # Socket setup (WSA, bind, listen)
-    │   └── client.c         # Accept / auth / shell / commands, I/O counters
+    │   ├── daemon.c         # Mutex, persistence check, and select loop
+    │   ├── network.c        # Winsock setup, bind, and listen
+    │   └── client.c         # Authentication, protocol, and I/O counters
     ├── Cmd/
-    │   ├── cmd_init.c       # Shell state initialization
-    │   ├── cmd_start.c      # Process creation, pipe wiring
-    │   └── cmd_io.c         # Command dispatch, framed output streaming
+    │   ├── cmd_init.c       # Shell-state initialization
+    │   ├── cmd_start.c      # Process creation and pipe wiring
+    │   └── cmd_io.c         # Command dispatch and output framing
     ├── Install/
-    │   └── install.c        # UAC elevation, System32 copy, daemon spawn, login
+    │   └── install.c        # UAC, System32 copy, and daemon spawn
     ├── Kill/
-    │   └── kill.c           # SeDebugPrivilege, process sweep, task removal
+    │   └── kill.c           # Privilege enablement and cleanup
     ├── Log/
     │   └── log.c            # Hidden append-only activity log
     ├── Other/
-    │   ├── context.c        # Anti-debug triage (API / PEB / remote)
-    │   ├── directory.c      # Self-path resolution
-    │   └── is_elevated.c    # Privilege check
-    ├── Persistence/
-    │   └── task/
-    │       └── task.c       # schtasks install / detect / uninstall
+    │   ├── context.c        # Debugger checks
+    │   ├── directory.c      # Executable-path resolution
+    │   └── is_elevated.c    # Privilege-state check
+    ├── Persistence/task/
+    │   └── task.c           # Scheduled-task lifecycle
     └── encrypt/
-        └── encryption.c     # SHA-256 (BCrypt) password verification
+        └── encryption.c     # SHA-256 verification through BCrypt
 ```
+
+</details>
 
 ## Build
 
-Requires `x86_64-w64-mingw32-gcc` (llvm-mingw supported):
+### Requirements
+
+- `make`
+- `x86_64-w64-mingw32-gcc` or a compatible LLVM-MinGW toolchain
+- Optional: UPX or MPRESS for packed targets
 
 ```bash
-make            # build ft_shield.exe
-make clean      # remove objects
-make fclean     # full clean
-make re         # rebuild
-make pack       # build + UPX (LZMA)
-make mpack      # build + TLS strip + MPRESS
+make
 ```
+
+| Command | Result |
+|:--|:--|
+| `make` | Builds `ft_shield.exe` |
+| `make clean` | Removes intermediate objects |
+| `make fclean` | Removes objects and the executable |
+| `make re` | Performs a clean rebuild |
+| `make pack` | Builds and packs with UPX/LZMA |
+| `make mpack` | Builds, strips TLS callbacks, and packs with MPRESS |
 
 ## Usage
 
+> [!IMPORTANT]
+> Use the following workflow only on the isolated Windows VM dedicated to the project.
+
 ```bash
-./ft_shield.exe             # install (UAC elevation if required)
-./ft_shield.exe --daemon    # daemon mode (spawned by the scheduled task)
-./ft_shield.exe --kill      # remove persistence and kill every instance
+./ft_shield.exe             # Install; requests UAC elevation if needed
+./ft_shield.exe --daemon    # Start daemon mode
+./ft_shield.exe --kill      # Stop instances and remove persistence
 ```
 
-First run as admin prints the user login, installs itself, and the daemon
-takes over:
+After installation, the lab client connects to the VM on port `4242`:
 
-```
+```console
 $ nc <vm-ip> 4242
 Keycode: ********
 Authentication success
 $> ?
 +--------------- COMMANDS ---------------+
-| ?      Show available commands        |
-| stats  Show session I/O statistics    |
-| shell  Enter safe shell mode           |
+| ?      Show available commands         |
+| stats  Show session I/O statistics     |
+| shell  Enter shell mode                |
 +----------------------------------------+
 $> shell
 Shell started
@@ -151,15 +190,18 @@ Leaving shell
 $>
 ```
 
-## Bonus Coverage
+## Bonus coverage
 
-- [x] I/O quantification — per-session `stats`
-- [x] Action logging — hidden timestamped audit trail
-- [x] Trojan disguise — full Edge identity spoofing
-- [x] Packing — UPX / MPRESS pipelines
-- [x] Detection hardening — signature-clean, ML-only flags, anti-debug triage
+- [x] Per-session I/O quantification through `stats`
+- [x] Timestamped action logging
+- [x] Full executable identity and metadata customization
+- [x] UPX and MPRESS packing pipelines
+- [x] Multi-layer debugger detection
 
-## Notes
+---
 
-Built for the ft_shield 42 school project, on an isolated lab VM.
-Educational purposes — understand the techniques to defend against them.
+<div align="center">
+
+Built for the **42 `ft_shield` project** and intended exclusively for controlled, educational lab use.
+
+</div>
