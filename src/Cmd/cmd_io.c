@@ -74,7 +74,6 @@ static int cmd_read_until(t_cmd *cmd, SOCKET slot, const char *marker)
 	char *marker_position;
 	DWORD bytes_read;
 	int length;
-	int send_length;
 
 	length = 0;
 	while (1)
@@ -85,6 +84,13 @@ static int cmd_read_until(t_cmd *cmd, SOCKET slot, const char *marker)
 		if (bytes_read == 0)
 			return (0);
 
+		if (length >= (int)sizeof(buffer) - 128)
+		{
+			if (slot != INVALID_SOCKET
+				&& !send_all(slot, buffer, length))
+				return (0);
+			length = 0;
+		}
 		buffer[length++] = character;
 		buffer[length] = '\0';
 
@@ -103,18 +109,6 @@ static int cmd_read_until(t_cmd *cmd, SOCKET slot, const char *marker)
 				&& !send_clean_output(slot, buffer))
 				return (0);
 			length = 0;
-		}
-		else if (length >= (int)sizeof(buffer) - 1)
-		{
-			send_length = length - 128;
-			buffer[send_length] = '\0';
-			if (slot != INVALID_SOCKET
-				&& !send_clean_output(slot, buffer))
-				return (0);
-			memmove(buffer, buffer + send_length,
-				length - send_length);
-			length -= send_length;
-			buffer[length] = '\0';
 		}
 	}
 }

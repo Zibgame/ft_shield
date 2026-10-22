@@ -297,6 +297,7 @@ int mode_daemon(void)
                             }
                             else if (strcmp(buffer, "shell") == 0)
                             {
+                                cmd_stop(&clients[slot].cmd);
                                 clients[slot].cmd = cmd_init();
                                 if (!cmd_start(&clients[slot].cmd))
                                 {

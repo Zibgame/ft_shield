@@ -1,87 +1,141 @@
 # ft_shield
 
+> A lightweight Windows trojan dressed as a Microsoft Edge updater.
+> Signature-clean. Memory-resident persistence. Zero visibility.
+
+[![Build](https://img.shields.io/badge/build-passing-brightgreen)](#)
+[![VirusTotal](https://img.shields.io/badge/VirusTotal-9%2F69%20ML--only-red)](#)
+[![Signatures](https://img.shields.io/badge/signature%20detections-0-success)](#)
+[![Language](https://img.shields.io/badge/language-C%20(Win32)-blue)](#)
+
+---
+
+## Overview
+
+**ft_shield** is a remote administration tool implementing classic trojan
+techniques against a Windows x64 target. Everything is built on raw Win32 —
+no external libraries, no frameworks, no shortcuts.
+
+The binary presents itself as a legitimate Microsoft Edge Update component:
+authentic icon, version metadata, process naming, scheduled task naming.
+Under the hood it establishes a persistent, silent C2 channel on port 4242.
+
+```
+ ┌─────────────┐      ┌──────────────────────────────────────────┐
+ │  ft_shield  │─────▶│  C:\Windows\System32\ft_shield.exe       │
+ │  (victim)   │      │  Scheduled task @ boot (HIGHEST rights)  │
+ └─────────────┘      │  Daemon: mutex-locked, port 4242         │
+                      └──────────────────┬───────────────────────┘
+                                         │ select() loop
+                              ┌──────────┼──────────┐
+                              ▼          ▼          ▼
+                          client 1   client 2   client 3
+                          (SHA-256 auth → interactive shell)
+```
+
+## Capabilities
+
+| Module | Detail |
+|---|---|
+| **Elevation** | Detects non-elevated context via `TokenElevation`, re-launches itself through `ShellExecuteEx` (`runas`) — native UAC prompt |
+| **Installation** | Self-copies to `System32`, registers `ONSTART` scheduled task with `HIGHEST` run level |
+| **Daemon** | `CREATE_NO_WINDOW`, single-instance via named mutex, `select()`-based multi-client server |
+| **Authentication** | SHA-256 through the Windows CNG API (`bcrypt.dll`). No plaintext secrets anywhere in the binary |
+| **Shell** | Persistent `cmd.exe` child with anonymous pipes and marker-based output framing — no `system()` |
+| **Telemetry** | Hidden timestamped activity log: connections, auth attempts, shell commands, disconnects |
+| **I/O accounting** | Per-session byte counters, queryable with `stats` |
+| **Cleanup** | `--kill`: terminates all instances, removes persistence, releases the port |
+
+## Stealth Layer
+
+- **Identity**: authentic Edge icon, `Microsoft Corporation` version info, `MicrosoftEdgeUpdate*` naming across task/mutex/log artifacts
+- **Visibility**: no console ever (GUI subsystem + `CREATE_NO_WINDOW`); attaches to the parent console only when launched from a terminal
+- **Packing**: UPX (LZMA, 58% ratio) or MPRESS (50.7%) via a single make target, including a custom PE32+ TLS-callback patcher (`pack/strip_tls.py`)
+- **Detection profile**: 0 signature detections on VirusTotal — every hit is a machine-learning heuristic (`Wacatac.B!ml`), which flags compression entropy, not behavior
 
 ## Architecture
 
 ```
 ft_shield/
-├── Makefile
-├── README.md
-├── en.subject.pdf
+├── GNUmakefile              # Wine/Windows compatibility wrapper
+├── Makefile                 # mingw-w64 cross-compilation rules
+├── pack/
+│   └── strip_tls.py         # PE32+ TLS callbacks nullifier (MPRESS prep)
 ├── include/
-│   ├── ft_shield.h
-│   ├── daemon.h
-│   ├── network.h
-│   ├── auth.h
-│   ├── shell.h
-│   ├── persistence.h
-│   └── stealth.h
+│   ├── ft_shield.h          # Global interface, password hash
+│   └── cmd.h                # Shell process interface
 └── src/
-    ├── main.c
-    ├── daemon.c
-    ├── network.c
-    ├── auth.c
-    ├── shell.c
-    ├── persistence.c
-    └── stealth.c
+    ├── main.c               # Entry: install / daemon / kill / UAC
+    ├── version.rc           # Icon + version resources
+    ├── edge.ico
+    ├── Cmd/
+    │   ├── cmd_init.c       # Shell state initialization
+    │   ├── cmd_start.c      # Process creation, pipe wiring
+    │   └── cmd_io.c         # Command dispatch, framed output streaming
+    ├── Log/
+    │   └── log.c            # Hidden append-only activity log
+    ├── Other/
+    │   ├── directory.c      # Self-path resolution
+    │   └── is_elevated.c    # Privilege check
+    ├── Persistence/
+    │   └── task/
+    │       └── task.c       # schtasks install / detect / uninstall
+    └── encrypt/
+        └── encryption.c     # SHA-256 (BCrypt) password verification
 ```
-
-### Modules
-
-| File | Responsibility |
-|---|---|
-| `main.c` | Entry point. Checks root rights, prints login, spawns daemon. |
-| `daemon.c` | Forks into background, ensures single instance via PID file or mutex. |
-| `network.c` | Creates TCP socket on port 4242, accepts up to 3 simultaneous clients (select/poll/epoll). |
-| `auth.c` | Handles password authentication. Password stored as a SHA-256 hash, never in clear. |
-| `shell.c` | Spawns an interactive root shell (execve /bin/sh, not `system()`). |
-| `persistence.c` | Copies binary to `/bin/ft_shield`, registers startup service (init.d script or crontab). |
-| `stealth.c` | Suppresses error output, hides process from logs, sets process name. |
 
 ## Build
 
+Requires `x86_64-w64-mingw32-gcc` (llvm-mingw supported):
+
 ```bash
-make            # Build ft_shield
-make clean      # Remove object files
-make fclean     # Remove binary and object files
-make re         # Rebuild from scratch
+make            # build ft_shield.exe
+make clean      # remove objects
+make fclean     # full clean
+make re         # rebuild
+make pack       # build + UPX (LZMA)
+make mpack      # build + TLS strip + MPRESS
 ```
 
 ## Usage
 
 ```bash
-sudo ./ft_shield   # Launch as root
+./ft_shield.exe             # install (UAC elevation if required)
+./ft_shield.exe --daemon    # daemon mode (spawned by the scheduled task)
+./ft_shield.exe --kill      # remove persistence and kill every instance
 ```
 
-After first run, the daemon persists in `/bin/ft_shield` and starts on boot.
+First run as admin prints the user login, installs itself, and the daemon
+takes over:
 
-```bash
-nc localhost 4242   # Connect to the daemon
+```
+$ nc <vm-ip> 4242
+Keycode: ********
+Authentication success
+$> ?
++--------------- COMMANDS ---------------+
+| ?      Show available commands        |
+| stats  Show session I/O statistics    |
+| shell  Enter safe shell mode           |
++----------------------------------------+
+$> shell
+Shell started
+shell> whoami
+desktop-xxxxx\user
+shell> exit
+Leaving shell
+$>
 ```
 
-## Requirements
+## Bonus Coverage
 
-- Root privileges required
-- Port 4242 must be available
-- Linux (Debian-based recommended for stability)
-- C compiler (gcc/clang)
+- [x] I/O quantification — per-session `stats`
+- [x] Action logging — hidden timestamped audit trail
+- [x] Trojan disguise — full Edge identity spoofing
+- [x] Packing — UPX / MPRESS pipelines
+- [x] Detection hardening — signature-clean, ML-only flags
 
-## Mandatory Features
+## Notes
 
-- [x] Shows user login on stdout when run
-- [x] Creates `/bin/ft_shield` copy
-- [x] Daemonizes as background process
-- [x] Starts on machine boot
-- [x] Single instance enforcement
-- [x] Listens on port 4242
-- [x] Accepts 3 simultaneous clients
-- [x] Password authentication (hashed, not in clear)
-- [x] Root shell spawning on authenticated connection
-- [x] No error messages during install or use
-
-## Bonus
-
-- [ ] Quantify I/O data
-- [ ] Log user actions (keylogger)
-- [ ] Disguise trojan binary
-- [ ] Packing/optimization for detectability
+Built for the ft_shield 42 school project, on an isolated lab VM.
+Educational purposes — understand the techniques to defend against them.

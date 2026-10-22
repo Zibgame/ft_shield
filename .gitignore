@@ -1,0 +1,6 @@
+obj/
+*.exe
+*.exe.bak
+*.o
+*.d
+ft_shield.exe*
