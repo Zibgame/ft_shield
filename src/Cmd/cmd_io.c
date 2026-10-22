@@ -6,13 +6,15 @@
 /*   By: zcadinot <zcadinot@student.42lehavre.      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/22 14:32:34 by zcadinot          #+#    #+#             */
-/*   Updated: 2026/10/22 14:47:28 by zcadinot         ###   ########.fr       */
+/*   Updated: 2026/10/22 15:14:54 by zcadinot         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ft_shield.h"
 
-#define CMD_END_MARKER "__CMD_OUTPUT_END__"
+#define CMD_PROMPT "__FT_PROMPT_92A7__"
+#define CMD_READY "__FT_READY_92A7__"
+#define CMD_END "__FT_END_92A7__"
 
 static int send_all(SOCKET slot, const char *buffer, int length)
 {
@@ -42,59 +44,115 @@ static int cmd_write(t_cmd *cmd, const char *buffer, DWORD length)
 	return (1);
 }
 
+static int send_clean_output(SOCKET slot, char *buffer)
+{
+	char *current;
+	char *prompt;
+	int length;
+
+	current = buffer;
+	while (1)
+	{
+		prompt = strstr(current, CMD_PROMPT);
+		if (prompt == NULL)
+			break;
+		length = (int)(prompt - current);
+		if (length > 0 && !send_all(slot, current, length))
+			return (0);
+		current = prompt + strlen(CMD_PROMPT);
+	}
+	length = (int)strlen(current);
+	if (length > 0 && !send_all(slot, current, length))
+		return (0);
+	return (1);
+}
+
+static int cmd_read_until(t_cmd *cmd, SOCKET slot, const char *marker)
+{
+	char buffer[8192];
+	char character;
+	char *marker_position;
+	DWORD bytes_read;
+	int length;
+	int send_length;
+
+	length = 0;
+	while (1)
+	{
+		if (!ReadFile(cmd->stdout_read, &character, 1,
+				&bytes_read, NULL))
+			return (0);
+		if (bytes_read == 0)
+			return (0);
+
+		buffer[length++] = character;
+		buffer[length] = '\0';
+
+		if (character == '\n')
+		{
+			marker_position = strstr(buffer, marker);
+			if (marker_position != NULL)
+			{
+				*marker_position = '\0';
+				if (slot != INVALID_SOCKET
+					&& !send_clean_output(slot, buffer))
+					return (0);
+				return (1);
+			}
+			if (slot != INVALID_SOCKET
+				&& !send_clean_output(slot, buffer))
+				return (0);
+			length = 0;
+		}
+		else if (length >= (int)sizeof(buffer) - 1)
+		{
+			send_length = length - 128;
+			buffer[send_length] = '\0';
+			if (slot != INVALID_SOCKET
+				&& !send_clean_output(slot, buffer))
+				return (0);
+			memmove(buffer, buffer + send_length,
+				length - send_length);
+			length -= send_length;
+			buffer[length] = '\0';
+		}
+	}
+}
+
+int cmd_prepare(t_cmd *cmd)
+{
+	const char setup[] =
+		"@echo off\r\n"
+		"prompt " CMD_PROMPT "\r\n"
+		"echo " CMD_READY "\r\n";
+
+	if (cmd == NULL || cmd->stdin_write == NULL)
+		return (0);
+	if (!cmd_write(cmd, setup, sizeof(setup) - 1))
+		return (0);
+	return (cmd_read_until(cmd, INVALID_SOCKET, CMD_READY));
+}
+
 int cmd_exec(t_cmd *cmd, const char *command)
 {
-	DWORD command_length;
-	const char marker_command[] =
-		"\r\necho " CMD_END_MARKER "\r\n";
+	const char end_command[] =
+		"\r\n"
+		"@echo off\r\n"
+		"@prompt " CMD_PROMPT "\r\n"
+		"@echo " CMD_END "\r\n";
 
 	if (cmd == NULL || cmd->stdin_write == NULL || command == NULL)
 		return (0);
-	command_length = lstrlenA(command);
-	if (!cmd_write(cmd, command, command_length))
+	if (!cmd_write(cmd, command, (DWORD)strlen(command)))
 		return (0);
-	if (!cmd_write(cmd, marker_command, sizeof(marker_command) - 1))
+	if (!cmd_write(cmd, end_command, sizeof(end_command) - 1))
 		return (0);
 	return (1);
 }
 
 int cmd_send_output(t_cmd *cmd, SOCKET slot)
 {
-	char line[4096];
-	char character;
-	char *marker;
-	DWORD bytes_read;
-	int length;
-
 	if (cmd == NULL || cmd->stdout_read == NULL)
 		return (0);
-	length = 0;
-	while (1)
-	{
-		if (!ReadFile(cmd->stdout_read, &character, 1,
-				&bytes_read, NULL))
-		{
-			if (GetLastError() == ERROR_BROKEN_PIPE)
-				return (1);
-			return (0);
-		}
-		if (bytes_read == 0)
-			return (1);
-		line[length++] = character;
-		if (character == '\n' || length == sizeof(line) - 1)
-		{
-			line[length] = '\0';
-			marker = strstr(line, CMD_END_MARKER);
-			if (marker != NULL)
-			{
-				if (marker > line
-					&& !send_all(slot, line, (int)(marker - line)))
-					return (0);
-				return (1);
-			}
-			if (!send_all(slot, line, length))
-				return (0);
-			length = 0;
-		}
-	}
+	return (cmd_read_until(cmd, slot, CMD_END));
 }

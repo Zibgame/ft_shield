@@ -6,7 +6,7 @@
 /*   By: zcadinot <zcadinot@student.42lehavre.      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/20 17:03:38 by zcadinot          #+#    #+#             */
-/*   Updated: 2026/10/20 17:24:05 by zcadinot         ###   ########.fr       */
+/*   Updated: 2026/10/22 15:31:25 by zcadinot         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,7 +21,7 @@ int task_install(const char *path, const char *arg)
     char cmd[4096];
 
     snprintf(cmd, sizeof(cmd),
-            "schtasks /create /sc ONLOGON "
+            "schtasks /create /sc ONSTART "
             "/tn \"%s\" "
             "/tr \"\\\"%s\\\" %s\" "
             "/rl HIGHEST "

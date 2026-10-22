@@ -20,9 +20,9 @@ endif
 endif
 
 CC          := x86_64-w64-mingw32-gcc
-CPPFLAGS    := -Iinclude
+CPPFLAGS    := -Iinclude -D_WIN32_WINNT=0x0A00
 CFLAGS      := -O3 -pipe -Wall -Wextra -Werror -MMD -MP
-LDFLAGS     := -lws2_32
+LDFLAGS     := -lws2_32 -lbcrypt
 
 SRC_DIR     := src
 OBJ_DIR     := obj
