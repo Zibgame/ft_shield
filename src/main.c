@@ -19,6 +19,13 @@
 #define TEST_PASSWORD "4242"
 #define MAX_CLIENTS 3
 
+typedef struct s_client
+{
+    SOCKET  socket;
+    int     authenticated;
+    int     shell_mode;
+}   t_client;
+
 SOCKET init_server(void)
 {
     WSADATA             wsa_data;
@@ -76,15 +83,16 @@ int mode_daemon(void)
     SOCKET server_fd;
     SOCKET client;
     SOCKET current;
-    SOCKET clients[MAX_CLIENTS];
+    t_client clients[MAX_CLIENTS];
     fd_set fd_list;
     fd_set fd_ready;
-    int authenticated[MAX_CLIENTS];
     char buffer[1024];
     int received;
     int slot;
     int i;
+    const char *help_message;
 
+    help_message = "\n+--------------- COMMANDS ---------------+\n| ?      Show available commands        |\n| shell  Enter safe shell mode           |\n+----------------------------------------+\n$> ";
     mutex = CreateMutexW(NULL, FALSE, L"Local\\MonApplicationMutex");
     if (mutex == NULL)
     {
@@ -116,8 +124,9 @@ int mode_daemon(void)
     i = 0;
     while (i < MAX_CLIENTS)
     {
-        clients[i] = INVALID_SOCKET;
-        authenticated[i] = 0;
+        clients[i].socket = INVALID_SOCKET;
+        clients[i].authenticated = 0;
+        clients[i].shell_mode = 0;
         i++;
     }
     FD_ZERO(&fd_list);
@@ -143,7 +152,7 @@ int mode_daemon(void)
                 else
                 {
                     slot = 0;
-                    while (slot < MAX_CLIENTS && clients[slot] != INVALID_SOCKET)
+                    while (slot < MAX_CLIENTS && clients[slot].socket != INVALID_SOCKET)
                         slot++;
                     if (slot == MAX_CLIENTS)
                     {
@@ -152,8 +161,9 @@ int mode_daemon(void)
                     }
                     else
                     {
-                        clients[slot] = client;
-                        authenticated[slot] = 0;
+                        clients[slot].socket = client;
+                        clients[slot].authenticated = 0;
+                        clients[slot].shell_mode = 0;
                         FD_SET(client, &fd_list);
                         send(client, "Keycode: ", 9, 0);
                         printf("Client connected: %llu\n", (unsigned long long)client);
@@ -163,7 +173,7 @@ int mode_daemon(void)
             else
             {
                 slot = 0;
-                while (slot < MAX_CLIENTS && clients[slot] != current)
+                while (slot < MAX_CLIENTS && clients[slot].socket != current)
                     slot++;
                 if (slot < MAX_CLIENTS)
                 {
@@ -173,28 +183,47 @@ int mode_daemon(void)
                         printf("Client disconnected: %llu\n", (unsigned long long)current);
                         FD_CLR(current, &fd_list);
                         closesocket(current);
-                        clients[slot] = INVALID_SOCKET;
-                        authenticated[slot] = 0;
+                        clients[slot].socket = INVALID_SOCKET;
+                        clients[slot].authenticated = 0;
+                        clients[slot].shell_mode = 0;
                     }
                     else
                     {
                         buffer[received] = '\0';
                         while (received > 0 && (buffer[received - 1] == '\n' || buffer[received - 1] == '\r'))
                             buffer[--received] = '\0';
-                        if (!authenticated[slot])
+                        if (!clients[slot].authenticated)
                         {
                             if (strcmp(buffer, TEST_PASSWORD) == 0)
                             {
-                                authenticated[slot] = 1;
+                                clients[slot].authenticated = 1;
                                 send(current, "Authentication success\n$> ", 26, 0);
                             }
                             else
                                 send(current, "Wrong keycode\nKeycode: ", 23, 0);
                         }
+                        else if (clients[slot].shell_mode)
+                        {
+                            if (strcmp(buffer, "exit") == 0)
+                            {
+                                clients[slot].shell_mode = 0;
+                                send(current, "Leaving shell\n$> ", 17, 0);
+                            }
+                        }
                         else
                         {
-                            printf("Client %llu: %s\n", (unsigned long long)current, buffer);
-                            send(current, "Message received\n$> ", 20, 0);
+                            if (strcmp(buffer, "?") == 0)
+                                send(current, help_message, (int)strlen(help_message), 0);
+                            else if (strcmp(buffer, "shell") == 0)
+                            {
+                                clients[slot].shell_mode = 1;
+                                send(current, "Safe shell started\nshell> ", 26, 0);
+                            }
+                            else
+                            {
+                                printf("Client %llu: %s\n", (unsigned long long)current, buffer);
+                                send(current, "Message received\n$> ", 20, 0);
+                            }
                         }
                     }
                 }
@@ -206,8 +235,8 @@ int mode_daemon(void)
     i = 0;
     while (i < MAX_CLIENTS)
     {
-        if (clients[i] != INVALID_SOCKET)
-            closesocket(clients[i]);
+        if (clients[i].socket != INVALID_SOCKET)
+            closesocket(clients[i].socket);
         i++;
     }
     closesocket(server_fd);
