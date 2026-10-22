@@ -39,7 +39,6 @@ static void server_loop(SOCKET server_fd)
         fd_ready = fd_list;
         if (select(0, &fd_ready, NULL, NULL, NULL) == SOCKET_ERROR)
         {
-            debug_printf("Error: select failed: %d\n", WSAGetLastError());
             break ;
         }
         i = 0;
@@ -73,12 +72,10 @@ int mode_daemon(void)
     mutex = CreateMutexW(NULL, FALSE, L"Global\\MicrosoftEdgeUpdateMutex");
     if (mutex == NULL)
     {
-        debug_printf("Erreur mutex : %lu\n", (unsigned long)GetLastError());
         return (1);
     }
     if (GetLastError() == ERROR_ALREADY_EXISTS)
     {
-        debug_printf("Already running...\n");
         CloseHandle(mutex);
         return (0);
     }

@@ -44,9 +44,7 @@ int mode_kill(void)
     HANDLE snapshot;
     PROCESSENTRY32 entry;
     DWORD self_pid;
-    int killed;
 
-    killed = 0;
     self_pid = GetCurrentProcessId();
     enable_debug_privilege();
     task_uninstall();
@@ -58,10 +56,9 @@ int mode_kill(void)
     {
         do {
             if (strcmp(entry.szExeFile, "ft_shield.exe") == 0)
-                killed += kill_process(entry.th32ProcessID, self_pid);
+                kill_process(entry.th32ProcessID, self_pid);
         } while (Process32Next(snapshot, &entry));
     }
     CloseHandle(snapshot);
-    debug_printf("Killed %d instance(s)\n", killed);
     return (0);
 }

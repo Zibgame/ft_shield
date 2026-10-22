@@ -42,7 +42,7 @@ static int sha256_string(const char *input, char output[65])
 	return (1);
 }
 
-int password_check(const char *password)
+int verify_access(const char *password)
 {
 	char hash[65];
 

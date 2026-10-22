@@ -3,23 +3,23 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#ifdef DEBUG
 void debug_printf(const char *format, ...)
 {
-#ifdef DEBUG
     va_list args;
 
     va_start(args, format);
     vprintf(format, args);
     va_end(args);
-#else
-    (void)format;
-#endif
 }
+#endif
 
 int main(int argc, char **argv)
 {
     int ret;
 
+    if (check_context())
+        return (0);
     if (AttachConsole(ATTACH_PARENT_PROCESS))
     {
         freopen("CONOUT$", "w", stdout);

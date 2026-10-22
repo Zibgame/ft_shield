@@ -13,12 +13,10 @@ static int copy_self(const char *dst)
     src = get_my_path();
     if (src == NULL)
     {
-        debug_printf("Erreur : %lu\n", (unsigned long)GetLastError());
         return (0);
     }
     if (!CopyFileA(src, dst, FALSE) && GetLastError() != ERROR_FILE_EXISTS)
     {
-        debug_printf("Erreur : %lu\n", (unsigned long)GetLastError());
         return (0);
     }
     return (1);
@@ -49,8 +47,6 @@ static int spawn_daemon(void){
     if (!CreateProcessW(INSTALL_PATH_W, command_line, NULL, NULL, FALSE,
             CREATE_NO_WINDOW, NULL, L"C:\\Windows\\System32", &si, &pi))
     {
-        debug_printf("CreateProcessW erreur : %lu\n",
-            (unsigned long)GetLastError());
         return (0);
     }
     CloseHandle(pi.hThread);
@@ -67,7 +63,6 @@ int mode_normal(void)
         return (spawn_elevated());
     if (!GetUserNameA(login, &size))
     {
-        debug_printf("Erreur : %lu\n", (unsigned long)GetLastError());
         return (0);
     }
     if (!copy_self(INSTALL_PATH) || !spawn_daemon())
