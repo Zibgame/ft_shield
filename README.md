@@ -37,15 +37,18 @@ Under the hood it establishes a persistent, silent C2 channel on port 4242.
 
 | Module | Detail |
 |---|---|
-| **Elevation** | Detects non-elevated context via `TokenElevation`, re-launches itself through `ShellExecuteEx` (`runas`) — native UAC prompt |
+| **Elevation** | Detects non-elevated context via `TokenElevation`, re-launches itself through `ShellExecuteEx` (`runas`) — native UAC prompt, refuses silently if denied |
 | **Installation** | Self-copies to `System32`, registers `ONSTART` scheduled task with `HIGHEST` run level |
 | **Daemon** | `CREATE_NO_WINDOW`, single-instance via named mutex, `select()`-based multi-client server |
-| **Authentication** | SHA-256 through the Windows CNG API (`bcrypt.dll`). No plaintext secrets anywhere in the binary |
-| **Shell** | Persistent `cmd.exe` child with anonymous pipes and marker-based output framing — no `system()` |
-| **Telemetry** | Hidden timestamped activity log: connections, auth attempts, shell commands, disconnects |
-| **I/O accounting** | Per-session byte counters, queryable with `stats` |
+| **Authentication** | SHA-256 through the Windows CNG API (`bcrypt.dll`). No plaintext secrets anywhere in the binary, wrong keycodes retried infinitely |
+| **Shell** | Persistent `cmd.exe` child with anonymous pipes and marker-based output framing — no `system()`, survives client disconnects, clean re-entry after `exit` |
+| **Multi-client** | 3 simultaneous authenticated sessions, 4th rejected with `Server full`; per-client isolated shell state |
+| **Colors** | ANSI-colored client protocol (green success, red errors, yellow prompts, cyan shell) — works over plain `nc` |
+| **Telemetry** | Hidden timestamped activity log: connections, auth attempts, shell commands, disconnects with I/O totals |
+| **I/O accounting** | Per-session byte counters (in/out), queryable with `stats` |
 | **Anti-analysis** | Triple debugger detection (`IsDebuggerPresent`, raw PEB flags, `CheckRemoteDebuggerPresent`) — silent exit on instrumentation |
-| **Cleanup** | `--kill`: terminates all instances (with `SeDebugPrivilege` elevation), removes persistence, releases the port |
+| **Privilege kill** | `--kill` enables `SeDebugPrivilege` to terminate even SYSTEM-owned daemon instances |
+| **Cleanup** | `--kill`: terminates all instances, removes persistence, releases the port |
 
 ## Stealth Layer
 
@@ -55,6 +58,14 @@ Under the hood it establishes a persistent, silent C2 channel on port 4242.
 - **Anti-analysis**: silent debugger triage at startup (API + PEB + remote checks)
 - **Packing**: UPX (LZMA, 58% ratio) or MPRESS (50.7%) via a single make target, including a custom PE32+ TLS-callback patcher (`pack/strip_tls.py`)
 - **Detection profile**: 0 signature detections on VirusTotal — every hit is a machine-learning heuristic (`Wacatac.B!ml`), which flags compression entropy, not behavior
+
+## Technical Highlights
+
+- **No dynamic allocation anywhere** — everything lives on the stack or in static storage; zero leak surface, every Windows handle closed on every path
+- **Zero information leakage** — `strings` on the binary reveals no port, no auth hint, no debug message; symbol names are neutral (`verify_access`, `check_context`)
+- **Win32 only** — Winsock, BCrypt, Toolhelp, ShellExecute, schtasks: pure system API, nothing that does the work for you
+- **Resilient protocol** — marker-framed shell output (`__FT_READY__`/`__FT_END__`) with overflow-safe streaming buffer; brutal client disconnects never crash the daemon
+- **Clean process hygiene** — `cmd_stop` gracefully exits the shell child before terminating; double `shell` command never leaks a `cmd.exe`
 
 ## Architecture
 
