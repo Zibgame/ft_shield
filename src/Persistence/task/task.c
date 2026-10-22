@@ -1,12 +1,3 @@
-/*                                                        :::      ::::::::   */
-/*   task.c                                             :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: zcadinot <zcadinot@student.42lehavre.      +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/10/20 17:03:38 by zcadinot          #+#    #+#             */
-/*   Updated: 2026/10/22 15:31:25 by zcadinot         ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
 
 #include "ft_shield.h"
 #include <stdlib.h>
@@ -31,7 +22,7 @@ int task_install(const char *path, const char *arg)
 
 int persistence_task_detect(void)
 {
-    
+
     char cmd[512];
 
     snprintf(cmd, sizeof(cmd),

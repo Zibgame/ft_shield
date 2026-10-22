@@ -36,6 +36,7 @@ OBJS        := $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 DEPS        := $(OBJS:.o=.d)
 
 all: $(NAME)
+	@echo "==> Build OK: $(NAME)"
 
 $(NAME): $(OBJS) $(RC_OBJ)
 	$(CC) $(OBJS) $(RC_OBJ) $(LDFLAGS) -o $@
@@ -67,10 +68,13 @@ re: fclean
 pack: all
 	$(UPX) --best --lzma $(NAME)
 	$(UPX) -t $(NAME)
+	@echo "==> Packed OK: $(NAME)"
 
 mpack: all
 	python3 pack/strip_tls.py $(NAME)
 	WINEPREFIX=$(WINEPREFIX) $(WINE) $(MPRESS) -b $(NAME)
+	@rm -f $(NAME).bak
+	@echo "==> Packed OK: $(NAME)"
 
 .PHONY: all clean fclean re
 

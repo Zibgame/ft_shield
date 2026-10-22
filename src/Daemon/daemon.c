@@ -1,24 +1,13 @@
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   daemon.c                                           :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: zcadinot <zcadinot@student.42lehavre.      +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/10/22 17:00:00 by zcadinot          #+#    #+#             */
-/*   Updated: 2026/10/22 17:00:00 by zcadinot         ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
 
 #include "ft_shield.h"
 #include "daemon.h"
 
 static const char *g_help =
-    "\n+--------------- COMMANDS ---------------+\n"
+    "\n" COLOR_YELLOW "+--------------- COMMANDS ---------------+\n"
     "| ?      Show available commands        |\n"
     "| stats  Show session I/O statistics    |\n"
     "| shell  Enter safe shell mode           |\n"
-    "+----------------------------------------+\n$> ";
+    "+----------------------------------------+\n" COLOR_RESET "$> ";
 
 static void clients_init(t_client clients[])
 {

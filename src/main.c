@@ -1,14 +1,3 @@
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   main.c                                             :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: zcadinot <zcadinot@student.42lehavre.      +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/10/19 18:02:57 by zcadinot          #+#    #+#             */
-/*   Updated: 2026/10/22 17:00:00 by zcadinot         ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
 
 #include "ft_shield.h"
 #include <stdarg.h>
@@ -29,18 +18,21 @@ void debug_printf(const char *format, ...)
 
 int main(int argc, char **argv)
 {
-    /* GUI app (-mwindows) has no console. Attach back to the parent's one
-       so the login is still visible when launched from a terminal,
-       while a double-click opens nothing. */
+    int ret;
+
     if (AttachConsole(ATTACH_PARENT_PROCESS))
     {
         freopen("CONOUT$", "w", stdout);
         freopen("CONOUT$", "w", stderr);
+        setvbuf(stdout, NULL, _IONBF, 0);
+        setvbuf(stderr, NULL, _IONBF, 0);
     }
     if (argc == 2 && strcmp(argv[1], "--daemon") == 0)
-        return (mode_daemon());
-    if (argc == 2 && strcmp(argv[1], "--kill") == 0)
-        return (mode_kill());
-
-    return (mode_normal());
+        ret = mode_daemon();
+    else if (argc == 2 && strcmp(argv[1], "--kill") == 0)
+        ret = mode_kill();
+    else
+        ret = mode_normal();
+    FreeConsole();
+    return (ret);
 }

