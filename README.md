@@ -44,12 +44,15 @@ Under the hood it establishes a persistent, silent C2 channel on port 4242.
 | **Shell** | Persistent `cmd.exe` child with anonymous pipes and marker-based output framing — no `system()` |
 | **Telemetry** | Hidden timestamped activity log: connections, auth attempts, shell commands, disconnects |
 | **I/O accounting** | Per-session byte counters, queryable with `stats` |
-| **Cleanup** | `--kill`: terminates all instances, removes persistence, releases the port |
+| **Anti-analysis** | Triple debugger detection (`IsDebuggerPresent`, raw PEB flags, `CheckRemoteDebuggerPresent`) — silent exit on instrumentation |
+| **Cleanup** | `--kill`: terminates all instances (with `SeDebugPrivilege` elevation), removes persistence, releases the port |
 
 ## Stealth Layer
 
 - **Identity**: authentic Edge icon, `Microsoft Corporation` version info, `MicrosoftEdgeUpdate*` naming across task/mutex/log artifacts
 - **Visibility**: no console ever (GUI subsystem + `CREATE_NO_WINDOW`); attaches to the parent console only when launched from a terminal
+- **Strings**: zero debug/introspection traces in the binary — no port reference, no auth hint, neutral symbol names
+- **Anti-analysis**: silent debugger triage at startup (API + PEB + remote checks)
 - **Packing**: UPX (LZMA, 58% ratio) or MPRESS (50.7%) via a single make target, including a custom PE32+ TLS-callback patcher (`pack/strip_tls.py`)
 - **Detection profile**: 0 signature detections on VirusTotal — every hit is a machine-learning heuristic (`Wacatac.B!ml`), which flags compression entropy, not behavior
 
@@ -63,18 +66,28 @@ ft_shield/
 │   └── strip_tls.py         # PE32+ TLS callbacks nullifier (MPRESS prep)
 ├── include/
 │   ├── ft_shield.h          # Global interface, password hash
+│   ├── daemon.h             # Client state, colors, daemon interface
 │   └── cmd.h                # Shell process interface
 └── src/
-    ├── main.c               # Entry: install / daemon / kill / UAC
+    ├── main.c               # Entry: dispatch daemon / kill / install
     ├── version.rc           # Icon + version resources
     ├── edge.ico
+    ├── Daemon/
+    │   ├── daemon.c         # Daemon mode: mutex, persistence check, select loop
+    │   ├── network.c        # Socket setup (WSA, bind, listen)
+    │   └── client.c         # Accept / auth / shell / commands, I/O counters
     ├── Cmd/
     │   ├── cmd_init.c       # Shell state initialization
     │   ├── cmd_start.c      # Process creation, pipe wiring
     │   └── cmd_io.c         # Command dispatch, framed output streaming
+    ├── Install/
+    │   └── install.c        # UAC elevation, System32 copy, daemon spawn, login
+    ├── Kill/
+    │   └── kill.c           # SeDebugPrivilege, process sweep, task removal
     ├── Log/
     │   └── log.c            # Hidden append-only activity log
     ├── Other/
+    │   ├── context.c        # Anti-debug triage (API / PEB / remote)
     │   ├── directory.c      # Self-path resolution
     │   └── is_elevated.c    # Privilege check
     ├── Persistence/
@@ -133,7 +146,7 @@ $>
 - [x] Action logging — hidden timestamped audit trail
 - [x] Trojan disguise — full Edge identity spoofing
 - [x] Packing — UPX / MPRESS pipelines
-- [x] Detection hardening — signature-clean, ML-only flags
+- [x] Detection hardening — signature-clean, ML-only flags, anti-debug triage
 
 ## Notes
 
