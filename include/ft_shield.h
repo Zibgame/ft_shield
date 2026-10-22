@@ -21,7 +21,10 @@
 	"0315b4020af3eccab7706679580ac87a710d82970733b8719e70af9b57e7b9e6"
 
 int     is_elevated(void);
+int     spawn_elevated(void);
 char    *get_my_path(void);
 int     task_install(const char *path, const char *arg);
 int     persistence_task_detect(void);
+int     task_uninstall(void);
 int     password_check(const char *password);
+void    log_write(const char *format, ...);

