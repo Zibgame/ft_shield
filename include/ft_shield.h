@@ -14,6 +14,7 @@
 #include <winsock2.h>
 #include <windows.h>
 #include <string.h>
+#include "cmd.h"
 
 int     is_elevated(void);
 char    *get_my_path(void);

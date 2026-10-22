@@ -12,9 +12,16 @@
 
 NAME        := ft_shield.exe
 
+JOBS        := $(shell nproc 2>/dev/null || echo 4)
+ifeq ($(MAKELEVEL),0)
+ifeq ($(filter -j% --jobs%,$(MAKEFLAGS)),)
+MAKEFLAGS   += -j$(JOBS)
+endif
+endif
+
 CC          := x86_64-w64-mingw32-gcc
 CPPFLAGS    := -Iinclude
-CFLAGS      := -O3 -Wall -Wextra -Werror -MMD -MP
+CFLAGS      := -O3 -pipe -Wall -Wextra -Werror -MMD -MP
 LDFLAGS     := -lws2_32
 
 SRC_DIR     := src
@@ -44,7 +51,8 @@ clean:
 fclean: clean
 	rm -f $(NAME)
 
-re: fclean all
+re: fclean
+	$(MAKE) all
 
 .PHONY: all clean fclean re
 

@@ -6,7 +6,7 @@
 /*   By: zcadinot <zcadinot@student.42lehavre.      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/19 18:02:57 by zcadinot          #+#    #+#             */
-/*   Updated: 2026/10/20 17:34:07 by zcadinot         ###   ########.fr       */
+/*   Updated: 2026/10/22 14:17:15 by zcadinot         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,6 +24,7 @@ typedef struct s_client
     SOCKET  socket;
     int     authenticated;
     int     shell_mode;
+    t_cmd   cmd;
 }   t_client;
 
 SOCKET init_server(void)
@@ -127,6 +128,7 @@ int mode_daemon(void)
         clients[i].socket = INVALID_SOCKET;
         clients[i].authenticated = 0;
         clients[i].shell_mode = 0;
+        clients[i].cmd = cmd_init();
         i++;
     }
     FD_ZERO(&fd_list);
@@ -164,6 +166,7 @@ int mode_daemon(void)
                         clients[slot].socket = client;
                         clients[slot].authenticated = 0;
                         clients[slot].shell_mode = 0;
+                        clients[slot].cmd = cmd_init();
                         FD_SET(client, &fd_list);
                         send(client, "Keycode: ", 9, 0);
                         printf("Client connected: %llu\n", (unsigned long long)client);
@@ -218,6 +221,7 @@ int mode_daemon(void)
                             {
                                 clients[slot].shell_mode = 1;
                                 send(current, "Safe shell started\nshell> ", 26, 0);
+
                             }
                             else
                             {
