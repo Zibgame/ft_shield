@@ -15,12 +15,15 @@ NAME        := ft_shield.exe
 CC          := x86_64-w64-mingw32-gcc
 CPPFLAGS    := -Iinclude
 CFLAGS      := -O3 -Wall -Wextra -Werror -MMD -MP
-LDFLAGS     :=
+LDFLAGS     := -lws2_32
 
 SRC_DIR     := src
 OBJ_DIR     := obj
 
-SRCS        := $(shell find $(SRC_DIR) -type f -name '*.c')
+# Recursively discover sources using GNU Make itself.  This avoids calling
+# Windows' find.exe when the project is built from PowerShell.
+rwildcard   = $(foreach entry,$(wildcard $1*),$(call rwildcard,$(entry)/,$2)$(filter $(subst *,%,$2),$(entry)))
+SRCS        := $(call rwildcard,$(SRC_DIR)/,*.c)
 OBJS        := $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 DEPS        := $(OBJS:.o=.d)
 
