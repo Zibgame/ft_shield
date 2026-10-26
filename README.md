@@ -43,17 +43,7 @@ The binary presents itself as a Microsoft Edge Update component through its icon
 
 ## How it works
 
-```mermaid
-flowchart LR
-    A["ft_shield.exe<br/>initial launch"] --> B["UAC elevation<br/>when required"]
-    B --> C["System32 copy"]
-    C --> D["Scheduled task<br/>ONSTART · HIGHEST"]
-    D --> E["Hidden daemon<br/>mutex locked"]
-    E --> F["TCP :4242<br/>select loop"]
-    F --> G1["Client 1<br/>isolated shell"]
-    F --> G2["Client 2<br/>isolated shell"]
-    F --> G3["Client 3<br/>isolated shell"]
-```
+[![Architecture diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/zibgame/ft_shield?utm_source=readme&utm_medium=badge)
 
 Each accepted client passes through authentication before reaching the command interface. Shell sessions use a persistent `cmd.exe` child connected through anonymous pipes and marker-based output framing.
 
