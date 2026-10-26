@@ -29,7 +29,7 @@ void client_reset(t_client *client, SOCKET socket)
     client->cmd = cmd_init();
 }
 
-static int find_slot(t_client clients[], SOCKET socket)
+int find_slot(t_client clients[], SOCKET socket)
 {
     int slot;
 

@@ -26,6 +26,7 @@ typedef struct s_client
 int         cli_send(t_client *client, SOCKET socket, const char *buf, int len);
 int         cli_send_str(t_client *client, SOCKET socket, const char *buf);
 SOCKET      init_server(void);
+int         find_slot(t_client clients[], SOCKET socket);
 void        client_reset(t_client *client, SOCKET socket);
 void        client_accept(SOCKET server_fd, t_client clients[], fd_set *fd_list);
 void        client_disconnect(t_client clients[], SOCKET current, fd_set *fd_list);

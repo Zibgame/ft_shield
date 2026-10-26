@@ -54,6 +54,7 @@ static void server_loop(SOCKET server_fd)
                     client_disconnect(clients, current, &fd_list);
                 else
                 {
+                    clients[find_slot(clients, current)].bytes_in += received;
                     buffer[received] = '\0';
                     while (received > 0
                         && (buffer[received - 1] == '\n'
