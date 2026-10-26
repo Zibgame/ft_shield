@@ -141,7 +141,7 @@ ft_shield/
 
 - `make`
 - `x86_64-w64-mingw32-gcc` or a compatible LLVM-MinGW toolchain
-- Optional: [Obsidian-Packer](https://github.com/Zibgame/Obsidian-Packer) installed in `~/.Apps/Obsidian-Packer` for packed targets
+- `git` and `objcopy` to install [Obsidian-Packer](https://github.com/Zibgame/Obsidian-Packer) for packed targets
 
 ```bash
 make
@@ -153,6 +153,7 @@ make
 | `make clean` | Removes intermediate objects |
 | `make fclean` | Removes objects and the executable |
 | `make re` | Performs a clean rebuild |
+| `make install-packer` | Clones and builds Obsidian-Packer in `tools/` |
 | `make pack` | Builds and packs with Obsidian-Packer |
 
 ## Usage

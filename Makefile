@@ -57,23 +57,36 @@ clean:
 fclean: clean
 	rm -f $(NAME) $(NAME).obsidian.tmp
 
-APPS_DIR    ?= /sgoinfre/goinfre/Perso/$(USER)/.home/.Apps
-OBSIDIAN_DIR ?= $(APPS_DIR)/Obsidian-Packer
+TOOLS_DIR   := tools
+OBSIDIAN_REPO := https://github.com/Zibgame/Obsidian-Packer.git
+OBSIDIAN_DIR := $(TOOLS_DIR)/Obsidian-Packer
 OBSIDIAN    := $(OBSIDIAN_DIR)/obsidian
 OBSIDIAN_STUB := $(OBSIDIAN_DIR)/build/obsidian-stub.exe
+OBSIDIAN_STAMP := $(OBSIDIAN_DIR)/.ft-shield-installed
+MINGW_BIN   ?= /sgoinfre/goinfre/Perso/$(USER)/.home/.Apps/llvm-mingw/bin
 PACKED_TMP  := $(NAME).obsidian.tmp
 
 re: fclean
 	$(MAKE) all
 
-pack: all
-	@test -x "$(OBSIDIAN)" || { echo "Missing Obsidian packer: $(OBSIDIAN)" >&2; exit 1; }
-	@test -f "$(OBSIDIAN_STUB)" || { echo "Missing Obsidian stub: $(OBSIDIAN_STUB)" >&2; exit 1; }
+install-packer: $(OBSIDIAN_STAMP)
+
+$(OBSIDIAN_STAMP):
+	@mkdir -p "$(TOOLS_DIR)"
+	@test -e "$(OBSIDIAN_DIR)" || git clone --depth 1 "$(OBSIDIAN_REPO)" "$(OBSIDIAN_DIR)"
+	$(MAKE) -C "$(OBSIDIAN_DIR)" parallel CFLAGS="-O2 -Wall -D_7ZIP_ST -DZ7_ST -fPIE"
+	$(MAKE) -C "$(OBSIDIAN_DIR)" stub-mingw \
+		MINGW_CXX="$(MINGW_BIN)/x86_64-w64-mingw32-g++" \
+		MINGW_CC="$(MINGW_BIN)/x86_64-w64-mingw32-gcc"
+	objcopy --subsystem windows "$(OBSIDIAN_STUB)"
+	@touch "$@"
+
+pack: all install-packer
 	$(OBSIDIAN) -o $(PACKED_TMP) $(OBSIDIAN_STUB) $(NAME)
 	mv $(PACKED_TMP) $(NAME)
 	@echo "==> Packed with Obsidian: $(NAME)"
 
 opack: pack
 
-.PHONY: all clean fclean re pack opack
+.PHONY: all clean fclean re install-packer pack opack
 

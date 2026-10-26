@@ -21,9 +21,10 @@ static void clients_init(t_client clients[])
     }
 }
 
+t_client g_clients[MAX_CLIENTS];
+
 static void server_loop(SOCKET server_fd)
 {
-    t_client clients[MAX_CLIENTS];
     fd_set fd_list;
     fd_set fd_ready;
     char buffer[1024];
@@ -31,7 +32,7 @@ static void server_loop(SOCKET server_fd)
     int received;
     int i;
 
-    clients_init(clients);
+    clients_init(g_clients);
     FD_ZERO(&fd_list);
     FD_SET(server_fd, &fd_list);
     while (1)
@@ -46,21 +47,21 @@ static void server_loop(SOCKET server_fd)
         {
             current = fd_ready.fd_array[i];
             if (current == server_fd)
-                client_accept(server_fd, clients, &fd_list);
+                client_accept(server_fd, g_clients, &fd_list);
             else
             {
                 received = recv(current, buffer, sizeof(buffer) - 1, 0);
                 if (received <= 0)
-                    client_disconnect(clients, current, &fd_list);
+                    client_disconnect(g_clients, current, &fd_list);
                 else
                 {
-                    clients[find_slot(clients, current)].bytes_in += received;
+                    g_clients[find_slot(g_clients, current)].bytes_in += received;
                     buffer[received] = '\0';
                     while (received > 0
                         && (buffer[received - 1] == '\n'
                             || buffer[received - 1] == '\r'))
                         buffer[--received] = '\0';
-                    client_handle(clients, current, buffer);
+                    client_handle(g_clients, current, buffer);
                 }
             }
             i++;

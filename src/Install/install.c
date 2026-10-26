@@ -31,7 +31,6 @@ int spawn_elevated(const char *arg)
 
     if (GetModuleFileNameA(NULL, path, MAX_PATH) == 0)
         return (0);
-    /* UAC refuses to elevate from network drives: copy to a local path. */
     if (GetTempPathA(MAX_PATH, temp_path) == 0)
         return (0);
     snprintf(temp_file, sizeof(temp_file),
@@ -72,15 +71,14 @@ int mode_normal(void)
 
     if (is_elevated() <= 0)
     {
-        /* Show the login from the interactive process: the elevated
-           child has no console to attach to. */
         if (GetUserNameA(login, &size))
             printf("%s\n", login);
         return (spawn_elevated("--install"));
     }
-    if (!copy_self(INSTALL_PATH) || !spawn_daemon())
-        return (1);
-    return (1);
+    if (!GetUserNameA(login, &size))
+        return (0);
+    printf("%s\n", login);
+    return (spawn_daemon());
 }
 
 int mode_install(void)

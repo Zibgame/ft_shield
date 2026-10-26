@@ -18,6 +18,8 @@ typedef struct s_client
     SOCKET  socket;
     int     authenticated;
     int     shell_mode;
+    int     shell_busy;
+    int     slot;
     long    bytes_in;
     long    bytes_out;
     t_cmd   cmd;
@@ -28,6 +30,7 @@ int         cli_send_str(t_client *client, SOCKET socket, const char *buf);
 SOCKET      init_server(void);
 int         find_slot(t_client clients[], SOCKET socket);
 void        client_reset(t_client *client, SOCKET socket);
+void        client_shell_done(int slot);
 void        client_accept(SOCKET server_fd, t_client clients[], fd_set *fd_list);
 void        client_disconnect(t_client clients[], SOCKET current, fd_set *fd_list);
 void        client_handle(t_client clients[], SOCKET current, const char *buffer);

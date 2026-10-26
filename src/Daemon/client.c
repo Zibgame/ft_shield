@@ -2,7 +2,33 @@
 #include "ft_shield.h"
 #include "daemon.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+extern t_client g_clients[MAX_CLIENTS];
+
+typedef struct s_shell_run
+{
+    int     slot;
+    SOCKET  socket;
+}   t_shell_run;
+
+static DWORD WINAPI shell_reader(LPVOID param)
+{
+    t_shell_run run;
+    t_client *client;
+
+    run = *((t_shell_run *)param);
+    free(param);
+    client = &g_clients[run.slot];
+    if (cmd_send_output(&client->cmd, run.socket))
+        cli_send_str(client, run.socket, "\nshell> ");
+    else
+        cli_send_str(client, run.socket,
+            COLOR_RED "Failed to read command output\n" COLOR_RESET);
+    client->shell_busy = 0;
+    return (0);
+}
 
 int cli_send(t_client *client, SOCKET socket, const char *buf, int len)
 {
@@ -24,6 +50,8 @@ void client_reset(t_client *client, SOCKET socket)
     client->socket = socket;
     client->authenticated = 0;
     client->shell_mode = 0;
+    client->shell_busy = 0;
+    client->slot = -1;
     client->bytes_in = 0;
     client->bytes_out = 0;
     client->cmd = cmd_init();
@@ -65,16 +93,29 @@ void client_accept(SOCKET server_fd, t_client clients[], fd_set *fd_list)
 void client_disconnect(t_client clients[], SOCKET current, fd_set *fd_list)
 {
     int slot;
+    int busy;
+    long bytes_in;
+    long bytes_out;
 
     slot = find_slot(clients, current);
     if (slot == MAX_CLIENTS)
         return ;
+    /* The shell reader thread may still use this slot: kill the pipe
+       reader by stopping the shell, then reset AFTER a short grace. */
+    busy = clients[slot].shell_busy;
+    bytes_in = clients[slot].bytes_in;
+    bytes_out = clients[slot].bytes_out;
     cmd_stop(&clients[slot].cmd);
     FD_CLR(current, fd_list);
     closesocket(current);
     client_reset(&clients[slot], INVALID_SOCKET);
-    log_write("DISCONNECT (in: %ld, out: %ld)",
-        clients[slot].bytes_in, clients[slot].bytes_out);
+    if (busy)
+    {
+        /* Let the pending reader notice the dead socket and exit. */
+        Sleep(100);
+        clients[slot].shell_busy = 0;
+    }
+    log_write("DISCONNECT (in: %ld, out: %ld)", bytes_in, bytes_out);
 }
 
 static void handle_auth(t_client *client, SOCKET socket, const char *buffer)
@@ -92,22 +133,42 @@ static void handle_auth(t_client *client, SOCKET socket, const char *buffer)
     }
 }
 
-static void handle_shell(t_client *client, SOCKET socket, const char *buffer)
+static void handle_shell(t_client *client, int slot, const char *buffer)
 {
+    t_shell_run *run;
+
     if (strcmp(buffer, "exit") == 0)
     {
         cmd_stop(&client->cmd);
         client->shell_mode = 0;
-        cli_send_str(client, socket, COLOR_CYAN "Leaving shell\n" COLOR_RESET "$> ");
+        cli_send_str(client, client->socket,
+            COLOR_CYAN "Leaving shell\n" COLOR_RESET "$> ");
         return ;
     }
     log_write("SHELL: %s", buffer);
+    if (client->shell_busy)
+    {
+        cli_send_str(client, client->socket,
+            "Previous command still running\nshell> ");
+        return ;
+    }
     if (!cmd_exec(&client->cmd, buffer))
-        cli_send_str(client, socket, COLOR_RED "Failed to execute command\n" COLOR_RESET "shell> ");
-    else if (!cmd_send_output(&client->cmd, socket))
-        cli_send_str(client, socket, COLOR_RED "Failed to read command output\n" COLOR_RESET);
-    else
-        cli_send_str(client, socket, "\nshell> ");
+    {
+        cli_send_str(client, client->socket,
+            COLOR_RED "Failed to execute command\n" COLOR_RESET "shell> ");
+        return ;
+    }
+    run = malloc(sizeof(*run));
+    if (run == NULL)
+        return ;
+    run->slot = slot;
+    run->socket = client->socket;
+    client->shell_busy = 1;
+    if (CloseHandle(CreateThread(NULL, 0, shell_reader, run, 0, NULL)) == 0)
+    {
+        client->shell_busy = 0;
+        free(run);
+    }
 }
 
 static void handle_stats(t_client *client, SOCKET socket)
@@ -158,7 +219,7 @@ void client_handle(t_client clients[], SOCKET current, const char *buffer)
     if (!clients[slot].authenticated)
         handle_auth(&clients[slot], current, buffer);
     else if (clients[slot].shell_mode)
-        handle_shell(&clients[slot], current, buffer);
+        handle_shell(&clients[slot], slot, buffer);
     else
         handle_command(&clients[slot], current, buffer);
 }
