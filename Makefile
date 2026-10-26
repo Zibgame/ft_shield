@@ -76,7 +76,7 @@ $(OBSIDIAN_STAMP):
 	@test -e "$(OBSIDIAN_DIR)" || git clone --depth 1 "$(OBSIDIAN_REPO)" "$(OBSIDIAN_DIR)"
 	$(MAKE) -C "$(OBSIDIAN_DIR)" parallel CFLAGS="-O2 -Wall -D_7ZIP_ST -DZ7_ST -fPIE"
 	$(MAKE) -C "$(OBSIDIAN_DIR)" stub-mingw \
-		MINGW_CXX="$(MINGW_BIN)/x86_64-w64-mingw32-g++" \
+		MINGW_CXX="$(MINGW_BIN)/x86_64-w64-mingw32-g++ -static" \
 		MINGW_CC="$(MINGW_BIN)/x86_64-w64-mingw32-gcc"
 	objcopy --subsystem windows "$(OBSIDIAN_STUB)"
 	@touch "$@"
