@@ -101,8 +101,6 @@ Each accepted client passes through authentication before reaching the command i
 ft_shield/
 ├── GNUmakefile              # Wine/Windows compatibility wrapper
 ├── Makefile                 # mingw-w64 cross-compilation rules
-├── pack/
-│   └── strip_tls.py         # PE32+ TLS callback nullifier
 ├── include/
 │   ├── ft_shield.h          # Global interface and password hash
 │   ├── daemon.h             # Client state and daemon interface
