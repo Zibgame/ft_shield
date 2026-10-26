@@ -55,26 +55,23 @@ clean:
 	rm -rf $(OBJ_DIR)
 
 fclean: clean
-	rm -f $(NAME) $(NAME).upx
+	rm -f $(NAME) $(NAME).obsidian.tmp
 
-UPX         := $(shell command -v upx 2>/dev/null || echo /tmp/upx-5.0.2-amd64_linux/upx)
-WINE        := /sgoinfre/goinfre/Perso/zcadinot/.home/.Apps/wine-wow64/root/opt/wine-stable/bin/wine
-WINEPREFIX  := /sgoinfre/goinfre/Perso/zcadinot/.home/.Apps/wine-prefix
-MPRESS      := /sgoinfre/goinfre/Perso/zcadinot/.home/.Apps/mpress/mpress.exe
+APPS_DIR    ?= /sgoinfre/goinfre/Perso/$(USER)/.home/.Apps
+OBSIDIAN_DIR ?= $(APPS_DIR)/Obsidian-Packer
+OBSIDIAN    := $(OBSIDIAN_DIR)/obsidian
+OBSIDIAN_STUB := $(OBSIDIAN_DIR)/build/obsidian-stub.exe
+PACKED_TMP  := $(NAME).obsidian.tmp
 
 re: fclean
 	$(MAKE) all
 
 pack: all
-	$(UPX) --best --lzma $(NAME)
-	$(UPX) -t $(NAME)
-	@echo "==> Packed OK: $(NAME)"
+	@test -x "$(OBSIDIAN)" || { echo "Missing Obsidian packer: $(OBSIDIAN)" >&2; exit 1; }
+	@test -f "$(OBSIDIAN_STUB)" || { echo "Missing Obsidian stub: $(OBSIDIAN_STUB)" >&2; exit 1; }
+	$(OBSIDIAN) -o $(PACKED_TMP) $(OBSIDIAN_STUB) $(NAME)
+	mv $(PACKED_TMP) $(NAME)
+	@echo "==> Packed with Obsidian: $(NAME)"
 
-mpack: all
-	python3 pack/strip_tls.py $(NAME)
-	WINEPREFIX=$(WINEPREFIX) $(WINE) $(MPRESS) -b $(NAME)
-	@rm -f $(NAME).bak
-	@echo "==> Packed OK: $(NAME)"
-
-.PHONY: all clean fclean re
+.PHONY: all clean fclean re pack
 

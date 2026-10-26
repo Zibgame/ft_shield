@@ -3,7 +3,6 @@
 #include <lmcons.h>
 #include <stdio.h>
 
-#define INSTALL_PATH "C:\\Windows\\System32\\ft_shield.exe"
 #define INSTALL_PATH_W L"C:\\Windows\\System32\\ft_shield.exe"
 
 static int copy_self(const char *dst)
@@ -22,16 +21,28 @@ static int copy_self(const char *dst)
     return (1);
 }
 
-int spawn_elevated(void)
+int spawn_elevated(const char *arg)
 {
     char path[MAX_PATH];
+    char temp_path[MAX_PATH];
+    char temp_file[MAX_PATH];
+    char parameters[MAX_PATH + 16];
     SHELLEXECUTEINFOA info = {0};
 
     if (GetModuleFileNameA(NULL, path, MAX_PATH) == 0)
         return (0);
+    /* UAC refuses to elevate from network drives: copy to a local path. */
+    if (GetTempPathA(MAX_PATH, temp_path) == 0)
+        return (0);
+    snprintf(temp_file, sizeof(temp_file),
+        "%sft_shield_elevate.exe", temp_path);
+    if (!CopyFileA(path, temp_file, FALSE))
+        return (0);
+    snprintf(parameters, sizeof(parameters), "%s", arg ? arg : "");
     info.cbSize = sizeof(info);
     info.lpVerb = "runas";
-    info.lpFile = path;
+    info.lpFile = temp_file;
+    info.lpParameters = parameters;
     info.nShow = SW_HIDE;
     if (!ShellExecuteExA(&info))
         return (0);
@@ -60,7 +71,7 @@ int mode_normal(void)
     DWORD size = sizeof(login);
 
     if (is_elevated() <= 0)
-        return (spawn_elevated());
+        return (spawn_elevated(NULL));
     if (!GetUserNameA(login, &size))
     {
         return (0);

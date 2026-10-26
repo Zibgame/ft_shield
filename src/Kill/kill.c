@@ -60,5 +60,8 @@ int mode_kill(void)
         } while (Process32Next(snapshot, &entry));
     }
     CloseHandle(snapshot);
+    if (GetFileAttributesA(INSTALL_PATH) != INVALID_FILE_ATTRIBUTES
+        && DeleteFileA(INSTALL_PATH))
+        SetFileAttributesA(INSTALL_PATH, FILE_ATTRIBUTE_NORMAL);
     return (0);
 }

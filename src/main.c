@@ -30,7 +30,12 @@ int main(int argc, char **argv)
     if (argc == 2 && strcmp(argv[1], "--daemon") == 0)
         ret = mode_daemon();
     else if (argc == 2 && strcmp(argv[1], "--kill") == 0)
-        ret = mode_kill();
+    {
+        if (is_elevated() > 0)
+            ret = mode_kill();
+        else
+            ret = spawn_elevated("--kill");
+    }
     else
         ret = mode_normal();
     FreeConsole();

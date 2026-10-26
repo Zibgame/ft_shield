@@ -80,7 +80,7 @@ Each accepted client passes through authentication before reaching the command i
 | **Visibility** | GUI subsystem and `CREATE_NO_WINDOW`; attaches to a parent console only when launched from a terminal |
 | **Strings** | Removes port hints, authentication hints, debug text, and descriptive internal symbol names |
 | **Anti-analysis** | Runs three debugger checks during startup and exits silently when instrumentation is detected |
-| **Packing** | Supports UPX/LZMA and MPRESS, including a custom PE32+ TLS-callback patcher |
+| **Packing** | Uses Obsidian-Packer with LZMA compression, ChaCha20 encryption, and in-memory PE restoration |
 | **Detection profile** | Reports no signature detections; observed hits are machine-learning heuristics such as `Wacatac.B!ml` |
 
 ## Technical highlights
@@ -143,7 +143,7 @@ ft_shield/
 
 - `make`
 - `x86_64-w64-mingw32-gcc` or a compatible LLVM-MinGW toolchain
-- Optional: UPX or MPRESS for packed targets
+- Optional: [Obsidian-Packer](https://github.com/Zibgame/Obsidian-Packer) installed in `~/.Apps/Obsidian-Packer` for packed targets
 
 ```bash
 make
@@ -155,8 +155,7 @@ make
 | `make clean` | Removes intermediate objects |
 | `make fclean` | Removes objects and the executable |
 | `make re` | Performs a clean rebuild |
-| `make pack` | Builds and packs with UPX/LZMA |
-| `make mpack` | Builds, strips TLS callbacks, and packs with MPRESS |
+| `make pack` | Builds and packs with Obsidian-Packer |
 
 ## Usage
 
@@ -195,7 +194,7 @@ $>
 - [x] Per-session I/O quantification through `stats`
 - [x] Timestamped action logging
 - [x] Full executable identity and metadata customization
-- [x] UPX and MPRESS packing pipelines
+- [x] Obsidian-Packer pipeline with encrypted in-memory restoration
 - [x] Multi-layer debugger detection
 
 ---
