@@ -26,4 +26,5 @@ int     task_uninstall(void);
 int     verify_access(const char *password);
 void    log_write(const char *format, ...);
 int     mode_normal(void);
+int     mode_install(void);
 int     mode_kill(void);

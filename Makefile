@@ -73,5 +73,7 @@ pack: all
 	mv $(PACKED_TMP) $(NAME)
 	@echo "==> Packed with Obsidian: $(NAME)"
 
-.PHONY: all clean fclean re pack
+opack: pack
+
+.PHONY: all clean fclean re pack opack
 

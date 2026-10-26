@@ -36,6 +36,8 @@ int main(int argc, char **argv)
         else
             ret = spawn_elevated("--kill");
     }
+    else if (argc == 2 && strcmp(argv[1], "--install") == 0)
+        ret = mode_install();
     else
         ret = mode_normal();
     FreeConsole();

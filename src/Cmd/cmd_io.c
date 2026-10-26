@@ -4,6 +4,7 @@
 #define CMD_PROMPT "__FT_PROMPT_92A7__"
 #define CMD_READY "__FT_READY_92A7__"
 #define CMD_END "__FT_END_92A7__"
+#define CMD_READ_TIMEOUT 30000
 
 static int send_all(SOCKET slot, const char *buffer, int length)
 {
@@ -62,16 +63,32 @@ static int cmd_read_until(t_cmd *cmd, SOCKET slot, const char *marker)
 	char character;
 	char *marker_position;
 	DWORD bytes_read;
+	DWORD avail;
+	DWORD elapsed;
 	int length;
 
 	length = 0;
+	elapsed = 0;
 	while (1)
 	{
+		avail = 0;
+		if (!PeekNamedPipe(cmd->stdout_read, NULL, 0, NULL,
+				&avail, NULL))
+			return (0);
+		if (avail == 0)
+		{
+			if (elapsed >= CMD_READ_TIMEOUT)
+				return (0);
+			Sleep(25);
+			elapsed += 25;
+			continue ;
+		}
 		if (!ReadFile(cmd->stdout_read, &character, 1,
 				&bytes_read, NULL))
 			return (0);
 		if (bytes_read == 0)
 			return (0);
+		elapsed = 0;
 
 		if (length >= (int)sizeof(buffer) - 128)
 		{

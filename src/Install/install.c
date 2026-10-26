@@ -71,13 +71,21 @@ int mode_normal(void)
     DWORD size = sizeof(login);
 
     if (is_elevated() <= 0)
-        return (spawn_elevated(NULL));
-    if (!GetUserNameA(login, &size))
     {
-        return (0);
+        /* Show the login from the interactive process: the elevated
+           child has no console to attach to. */
+        if (GetUserNameA(login, &size))
+            printf("%s\n", login);
+        return (spawn_elevated("--install"));
     }
     if (!copy_self(INSTALL_PATH) || !spawn_daemon())
         return (1);
-    printf("%s\n", login);
+    return (1);
+}
+
+int mode_install(void)
+{
+    if (!copy_self(INSTALL_PATH) || !spawn_daemon())
+        return (1);
     return (1);
 }

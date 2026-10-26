@@ -10,12 +10,13 @@ int task_install(const char *path, const char *arg)
     char cmd[4096];
 
     snprintf(cmd, sizeof(cmd),
-            "schtasks /create /sc ONSTART "
-            "/tn \"%s\" "
-            "/tr \"\\\"%s\\\" %s\" "
-            "/rl HIGHEST "
-            "/f >nul 2>&1",
-            TASK_NAME, path, arg);
+        "schtasks /create /sc ONSTART "
+        "/tn \"%s\" "
+        "/tr \"\\\"%s\\\" %s\" "
+        "/ru SYSTEM "
+        "/rl HIGHEST "
+        "/f >nul 2>&1",
+        TASK_NAME, path, arg);
 
     return (system(cmd) == 0);
 }
