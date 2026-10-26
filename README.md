@@ -43,7 +43,7 @@ The binary presents itself as a Microsoft Edge Update component through its icon
 
 ## How it works
 
-[![Architecture diagram of zibgame/ft_shield](https://gitdiagram.com/zibgame/ft_shield/diagram.png)](https://gitdiagram.com/zibgame/ft_shield?utm_source=readme&utm_medium=picture)
+[![Architecture diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/zibgame/ft_shield?utm_source=readme&utm_medium=badge)
 
 Each accepted client passes through authentication before reaching the command interface. Shell sessions use a persistent `cmd.exe` child connected through anonymous pipes and marker-based output framing.
 
